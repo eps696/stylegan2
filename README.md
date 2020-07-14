@@ -2,7 +2,8 @@
 
 <p align='center'><img src='_out/mix_urart6-1024-f-4096-1024.jpg' /></p>
 
-This version of famous [StyleGAN2] is intended mostly for fellow artists and students, who rarely look at scientific metrics, but rather need a working tool. At least, this is what I use daily myself. For more explicit details refer to the original implementations. 
+This version of famous [StyleGAN2] is intended mostly for fellow artists and students, who rarely look at scientific metrics, but rather need a working tool. At least, this is what I use daily myself. 
+Tested on Tensorflow 1.14, requires `pyturbojpeg` for JPG support. For more explicit details refer to the original implementations. 
 
 ## Features
 * inference (image generation) in arbitrary resolution (may cause artifacts!)
