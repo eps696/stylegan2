@@ -7,8 +7,7 @@ from scipy.ndimage import gaussian_filter
 from scipy.interpolate import CubicSpline as CubSpline
 from scipy.special import comb
 import scipy
-from skimage.transform import resize as imresize 
-from imageio import imread, imsave
+from imageio import imread
 
 import tensorflow; tf = tensorflow.compat.v1 if hasattr(tensorflow.compat,'v1') else tensorflow
 
@@ -151,16 +150,6 @@ def pad_up_to(x, size, type='centr'):
     y = tf.pad(x, padding, 'symmetric') # REFLECT, SYMMETRIC
     # print(' pad', sh, 'to', size, '\t == ', padding, y.shape)
     return y
-
-def fix_size_np(x, size): # for dataset to tfrecords
-    if not len(x.shape) == 3:
-        raise Exception(" Wrong data rank, shape:", x.shape)
-    if (x.shape[1], x.shape[2]) == size:
-        return x
-    x = x.transpose(1,2,0)
-    x = imresize(x, size, preserve_range=True)
-    x = x.transpose(2,0,1)
-    return x
 
 def fix_size(x, size, scale_type='centr', order='BCHW'): # scale_type = one of [fit, centr, side]
     if not len(x.get_shape()) == 4:

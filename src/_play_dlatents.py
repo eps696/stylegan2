@@ -44,7 +44,7 @@ def main():
     # setup generator
     fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
     Gs_kwargs = dnnlib.EasyDict()
-    Gs_kwargs.func_name = 'training.networks_stylegan2.G_main'
+    Gs_kwargs.func_name = 'training.stylegan2_custom.G_main'
     Gs_kwargs.verbose = False
     Gs_kwargs.resolution = res
     Gs_kwargs.size = a.size

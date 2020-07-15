@@ -11,8 +11,6 @@ import dnnlib.tflib as tflib
 from dnnlib.tflib.ops.upfirdn_2d import upsample_2d, downsample_2d, upsample_conv_2d, conv_downsample_2d
 from dnnlib.tflib.ops.fused_bias_act import fused_bias_act
 
-from util.utilgan import hw_scales, fix_size
-
 # NOTE: Do not import any application-specific modules here!
 # Specify all network parameters as kwargs.
 
@@ -296,8 +294,6 @@ def G_synthesis_stylegan2(
     num_channels        = 3,            # Number of output color channels.
     resolution          = 1024,         # Base model resolution (corresponding to the layer count)
     init_res            = [4,4],      # Initial (minimal) resolution for progressive training
-    size                = None,       # Output size
-    scale_type          = None,       # Arbitrary size: fit (scaling), reflect (pad), symmetric (pad)
     fmap_base           = 16 << 10,     # Overall multiplier for the number of feature maps.
     fmap_decay          = 1.0,          # log2 feature map reduction when doubling the resolution.
     fmap_min            = 1,            # Minimum number of feature maps in any layer.
@@ -313,17 +309,6 @@ def G_synthesis_stylegan2(
     **_kwargs):                         # Ignore unrecognized keyword args.
 
     res_log2 = int(np.log2(resolution))
-    assert resolution == 2**res_log2 and resolution >= 4
-    
-    # calculate intermediate layers sizes for arbitrary output resolution
-    custom_res = (resolution * init_res[0] // 4, resolution * init_res[1] // 4)
-    if size is None: size = custom_res
-    if init_res != [4,4] and verbose:
-        print(' .. init res', init_res, size)
-    keep_first_layers = 2 if scale_type == 'fit' else None
-    hws = hw_scales(size, custom_res, res_log2 - 2, keep_first_layers, verbose)
-    if verbose: print(hws, '..', custom_res, res_log2-1)
-    
     def nf(stage): return np.clip(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_min, fmap_max)
     assert architecture in ['orig', 'skip', 'resnet']
     act = nonlinearity
@@ -342,31 +327,26 @@ def G_synthesis_stylegan2(
         noise_inputs.append(tf.get_variable('noise%d' % layer_idx, shape=shape, initializer=tf.initializers.random_normal(), trainable=False))
 
     # Single convolution layer with all the bells and whistles.
-    def layer(x, layer_idx, size, fmaps, kernel, up=False):
+    def layer(x, layer_idx, fmaps, kernel, up=False):
         x = modulated_conv2d_layer(x, dlatents_in[:, layer_idx], fmaps=fmaps, kernel=kernel, up=up, resample_kernel=resample_kernel, fused_modconv=fused_modconv, impl=impl)
-        if size is not None and up is True:
-            x = fix_size(x, size, scale_type)
         if randomize_noise:
             noise = tf.random_normal([tf.shape(x)[0], 1, x.shape[2], x.shape[3]], dtype=x.dtype)
         else:
             noise = tf.cast(noise_inputs[layer_idx], x.dtype)
-            noise = fix_size(noise, (x.shape[2], x.shape[3]), scale_type=scale_type)
         noise_strength = tf.get_variable('noise_strength', shape=[], initializer=tf.initializers.zeros())
         x += noise * tf.cast(noise_strength, x.dtype)
         return apply_bias_act(x, act=act, impl=impl)
 
     # Building blocks for main layers.
-    def block(x, res, size): # res = 3..res_log2
+    def block(x, res): # res = 3..res_log2
         t = x
         with tf.variable_scope('Conv0_up'):
-            x = layer(x, layer_idx=res*2-5, size=size, fmaps=nf(res-1), kernel=3, up=True)
+            x = layer(x, layer_idx=res*2-5, fmaps=nf(res-1), kernel=3, up=True)
         with tf.variable_scope('Conv1'):
-            x = layer(x, layer_idx=res*2-4, size=size, fmaps=nf(res-1), kernel=3)
+            x = layer(x, layer_idx=res*2-4, fmaps=nf(res-1), kernel=3)
         if architecture == 'resnet':
             with tf.variable_scope('Skip'):
                 t = conv2d_layer(t, fmaps=nf(res-1), kernel=1, up=True, resample_kernel=resample_kernel, impl=impl)
-                if size is not None:
-                    t = fix_size(t, (x.shape[2], x.shape[3]), scale_type=scale_type)
                 x = (x + t) * (1 / np.sqrt(2))
         return x
 
@@ -386,18 +366,16 @@ def G_synthesis_stylegan2(
             x = tf.get_variable('const', shape=[1, nf(1), *init_res], initializer=tf.initializers.random_normal())
             x = tf.tile(tf.cast(x, dtype), [tf.shape(dlatents_in)[0], 1, 1, 1])
         with tf.variable_scope('Conv'):
-            x = layer(x, layer_idx=0, size=None, fmaps=nf(1), kernel=3)
+            x = layer(x, layer_idx=0, fmaps=nf(1), kernel=3)
         if architecture == 'skip':
             y = torgb(x, y, 2)
 
     # Main layers.
     for res in range(3, res_log2 + 1):
         with tf.variable_scope('%dx%d' % (2**res, 2**res)):
-            x = block(x, res, hws[res-2])
+            x = block(x, res)
             if architecture == 'skip':
                 y = upsample(y)
-                if size is not None:
-                    y = fix_size(y, hws[res-2], scale_type=scale_type)
             if architecture == 'skip' or res == res_log2:
                 y = torgb(x, y, res)
     images_out = y
