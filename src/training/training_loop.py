@@ -145,7 +145,7 @@ def training_loop(
     # custom resolution - for saved model name below
     resolution = training_set.resolution
     if training_set.init_res != [4,4]:
-        init_res_str = '-%dx%d' % (training_set.init_res[0], training_set.init_res[1])
+        init_res_str = '-%dx%d' % (training_set.init_res[1], training_set.init_res[0])
     else:
         init_res_str = ''
     ext = 'png' if training_set.shape[0] == 4 else 'jpg'

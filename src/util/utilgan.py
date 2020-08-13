@@ -212,9 +212,13 @@ def calc_res(shape):
     base1 = 2**int(np.log2(shape[1]))
     base = min(base0, base1)
     min_res = min(shape[0], shape[1])
+    
+    def int_log2(xs, base):
+        return [x * 2**(2-int(np.log2(base))) % 1 == 0 for x in xs]
     if min_res != base or max(*shape) / min(*shape) >= 2:
-        if np.log2(base) < 10:
+        if np.log2(base) < 10 and all(int_log2(shape, base*2)):
             base = base * 2
+
     return base # , [shape[0]/base, shape[1]/base]
 
 def calc_init_res(shape, resolution=None):

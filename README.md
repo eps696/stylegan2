@@ -2,19 +2,18 @@
 
 <p align='center'><img src='_out/mix_urart6-1024-f-4096-1024.jpg' /></p>
 
-This version of famous [StyleGAN2] is intended mostly for fellow artists and students, who rarely look at scientific metrics, but rather need a working tool. At least, this is what I use daily myself. 
+This version of famous [StyleGAN2] is intended mostly for fellow artists and students, who rarely look at scientific metrics, but rather need a working creative tool. At least, this is what I use daily myself. 
 Tested on Tensorflow 1.14, requires `pyturbojpeg` for JPG support. For more explicit details refer to the original implementations. 
 
 ## Features
 * inference (image generation) in arbitrary resolution (may cause artifacts!)
-* non-square aspect ratio support (picked from dataset)
-  (resolution must be divisible by 2**n, such as 512x256, 1280x768, etc.)
+* non-square aspect ratio support (picked from dataset; resolution must be divisible by 2**n, such as 512x256, 1280x768, etc.)
 * transparency (alpha channel) support (picked from dataset)
 * freezing lower D layers for better finetuning (from [Freeze the Discriminator])
 
 Windows batch-commands for main tasks, such as ::
 * video rendering with slerp/cubic/gauss trajectory smoothing (requires [FFMPEG])
-* animated "playback" of saved latent snapshots, etc.
+* animated "playback" of saved latent snapshots, direction vectors, etc.
 
 also, from [Data-Efficient GANs] ::
 * differential augmentation for fast training on small datasets (~100 images)
@@ -32,7 +31,7 @@ also, from [Peter Baylies] and [skyflynil] ::
 ```
  multicrop.bat source 512 256 
 ```
-This will cut every source image (or video frame) into 512x512px fragments, overlapped with shift 256px by X and Y. Result will be in directory `source-sub`, rename it as you wish. Non-square dataset should be prepared separately.
+This will cut every source image (or video frame) into 512x512px fragments, overlapped with 256px shift by X and Y. Result will be in directory `source-sub`, rename it as you wish. Non-square dataset should be prepared separately.
 
 * Make compact TFRecords dataset from directory with JPG images `data/mydata`:
 ```
@@ -49,7 +48,7 @@ This will run training process, according to the options in `src/train.py`. If t
 Please note: we save both full models (containing G/D/Gs networks for further training) as `snapshot-baseresolution-config-kimg.pkl`, and compact models (containing only Gs network for inference) as  `dataset-baseresolution-config-kimg.pkl`, e.g. `mydata-512-f-0360.pkl`. For non-square dataset, the name will be extended to `dataset-baseresolution-config-initialXY-kimg.pkl` (e.g.`mydata-512-f-3x4-0360.pkl`). Changing this naming may break other scripts behaviour! 
 
 For small datasets (100x images instead of 10000x) one may add `--d_aug` option to use [Differential Augmentation] for more effective training. 
-The length of the training is defined by `--lod_step_kimg XX` option. It's kind of legacy from [progressive GAN] and defines one step of progressive training. The network with base resolution 1024px will be trained for 20 such steps, for 512px - 18 steps, et cetera. Reasonable value for big datasets is 300-600, while in `--d_aug` mode 20-40 is sufficient.
+The length of the training is defined by `--lod_step_kimg XX` option. It's kind of legacy from [progressive GAN] and defines one step of progressive training. The network with base resolution 1024px will be trained for 20 such steps, for 512px - 18 steps, et cetera. Reasonable `lod_step_kimg` value for big datasets is 300-600, while in `--d_aug` mode 20-40 is sufficient.
 
 * Resume training on `mydata` dataset from the last saved model at `train/000-mydata-512-f` directory:
 ```
@@ -72,7 +71,7 @@ The result is saved in `models` directory. Useful for foreign downloaded models.
 ```
  gen.bat ffhq-1024-f 1280-720 500-20 
 ```
-This will load `ffhq-1024-f.pkl` from `model` directory and make a looped 1280x720 px video of 500 frames, with interpolation step of 20 frames between keypoints. Please note: omitting `.pkl` extension enables custom resolution. Using full filename with extention will load the network from PKL itself (useful to test foreign downloaded models). There are `--cubic` and `--gauss` options for animation smoothing, and few `--scale_type` choices. Besides video/sequence output, this command will also save all traversed dlatent points as Numpy array in `*.npy` file.
+This will load `ffhq-1024-f.pkl` from `model` directory and make a looped 1280x720 px video of 500 frames, with interpolation step of 20 frames between keypoints. Please note: omitting `.pkl` extension enables custom resolution. Using full filename with extension will load the network params from PKL (useful to test foreign downloaded models). There are `--cubic` and `--gauss` options for animation smoothing, and few `--scale_type` choices. Besides video/sequence output, this command will also save all traversed dlatent points as Numpy array in `*.npy` file.
 
 * Project external images onto StyleGAN2 model dlatent space (ensure first that `vgg16_zhang_perceptual.pkl` is downloaded from Git LFS to `models/vgg`):
 ```
@@ -90,7 +89,7 @@ This will load saved dlatent points from `_in/mynpy` and produce a smooth looped
 ```
  play_vectors.bat ffhq-1024-f.pkl blonde458.npy vectors_ffhq 
 ```
-This will load base dlatent point from `_in/blonde458.npy` and move it along latent direction vectors from `_in/vectors_ffhq`, one by one. Result is saved as a looped video. 
+This will load base dlatent point from `_in/blonde458.npy` and move it along latent direction vectors from `_in/vectors_ffhq`, one by one. Result is saved as looped video. 
 
 [StyleGAN2]: <https://github.com/NVlabs/stylegan2>
 [Peter Baylies]: <https://github.com/pbaylies/stylegan2>

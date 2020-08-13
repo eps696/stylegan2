@@ -110,7 +110,7 @@ def main():
         print(' styling with latent', a.style_npy_file)
         style_dlatent = load_latents(a.style_npy_file)
         while len(style_dlatent.shape) < 4: style_dlatent = np.expand_dims(style_dlatent, 0)
-        # try other values < dl_dim besides 5
+        # try replace 5 by other value, less than dl_dim 
         key_dlatents[:, :, range(5,dl_dim), :] = style_dlatent[:, :, range(5,dl_dim), :]
        
     frames = key_dlatents.shape[0] * a.fstep

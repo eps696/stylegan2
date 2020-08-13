@@ -85,6 +85,7 @@ def main():
         Gs.copy_vars_from(network)
     # Gs.print_layers()
     print(' out shape', Gs.output_shape[1:])
+    if a.size is None: a.size = Gs.output_shape[2:]
 
     z_dim = Gs.input_shape[1]
     shape = (1, z_dim)

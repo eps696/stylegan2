@@ -4,6 +4,7 @@
 # To view a copy of this license, visit
 # https://nvlabs.github.io/stylegan2/license.html
 
+import os
 import numpy as np
 import tensorflow as tf
 import dnnlib
@@ -97,7 +98,7 @@ class Projector:
         self._images_expr = self._Gs.components.synthesis.get_output_for(self._dlatents_expr, randomize_noise=False)
 
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
-        proc_images_expr = (self._images_expr + 1) * (255 / 2)
+        proc_images_expr = (self._images_expr + 1) * (255 / 2)[:,:3,:,:] # go uint range, fix to rgb colospace
         sh = proc_images_expr.shape.as_list()
         if sh[2] > 256:
             factor = sh[2] // 256
@@ -107,8 +108,12 @@ class Projector:
         self._info('Building loss graph...')
         self._target_images_var = tf.Variable(tf.zeros(proc_images_expr.shape), name='target_images_var')
         if self._lpips is None:
-            # self._lpips = misc.load_pkl('https://drive.google.com/uc?id=1N2-m9qszOeVC9Tq77WxsLnuWwOedQiD2') # vgg16_zhang_perceptual.pkl
-            self._lpips = misc.load_pkl('models/vgg/vgg16_zhang_perceptual.pkl')
+            vgg_file = 'models/vgg/vgg16_zhang_perceptual.pkl'
+            if os.path.isfile(vgg_file) and os.stat(vgg_file).st_size == 58871973:
+                self._lpips = misc.load_pkl(vgg_file)
+            else:
+                self._lpips = misc.load_pkl('https://drive.google.com/uc?id=1N2-m9qszOeVC9Tq77WxsLnuWwOedQiD2')
+            
         self._dist = self._lpips.get_output_for(proc_images_expr, self._target_images_var)
         self._loss = tf.reduce_sum(self._dist)
 
