@@ -98,7 +98,7 @@ class Projector:
         self._images_expr = self._Gs.components.synthesis.get_output_for(self._dlatents_expr, randomize_noise=False)
 
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
-        proc_images_expr = (self._images_expr + 1) * (255 / 2)[:,:3,:,:] # go uint range, fix to rgb colospace
+        proc_images_expr = (self._images_expr[:,:3,:,:] + 1) * (255 / 2) # go uint range, fix to rgb colospace
         sh = proc_images_expr.shape.as_list()
         if sh[2] > 256:
             factor = sh[2] // 256
