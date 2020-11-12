@@ -70,13 +70,14 @@ def main():
     pkl_name = osp.splitext(a.model)[0]
     with open(pkl_name + '.pkl', 'rb') as file:
         network = pickle.load(file, encoding='latin1')
-    try: _, _, Gs = network
-    except:    Gs = network
-    Gs_kwargs.num_channels = Gs.output_shape[1]
+    try: _, _, network = network
+    except: pass
+    Gs_kwargs.num_channels = network.output_shape[1]
 
     # reload custom network, if needed
     if '.pkl' in a.model.lower(): 
         print(' .. Gs from pkl ..')
+        Gs = network
     else: 
         print(' .. Gs custom ..')
         Gs = tflib.Network('Gs', **Gs_kwargs)

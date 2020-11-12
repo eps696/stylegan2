@@ -20,7 +20,7 @@ goto end
 
 
 :help
-echo Usage: _gen model x-y framecount-transit
-echo e.g.:  _gen codex 1280-720 100-25
+echo Usage: gen model x-y framecount-transit
+echo e.g.:  gen ffhq-1024-f 1280-720 100-25
 
 :end
