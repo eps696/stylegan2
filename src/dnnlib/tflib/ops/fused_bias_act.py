@@ -1,8 +1,10 @@
-# Copyright (c) 2019, NVIDIA Corporation. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
-# This work is made available under the Nvidia Source Code License-NC.
-# To view a copy of this license, visit
-# https://nvlabs.github.io/stylegan2/license.html
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 """Custom TensorFlow ops for efficient bias and activation."""
 
@@ -31,7 +33,7 @@ activation_funcs = {
 
 #----------------------------------------------------------------------------
 
-def fused_bias_act(x, b=None, axis=1, act='linear', alpha=None, gain=None, impl='cuda'):
+def fused_bias_act(x, b=None, axis=1, act='linear', alpha=None, gain=None, clamp=None, impl='cuda'):
     r"""Fused bias and activation function.
 
     Adds bias `b` to activation tensor `x`, evaluates activation function `act`,
@@ -55,6 +57,8 @@ def fused_bias_act(x, b=None, axis=1, act='linear', alpha=None, gain=None, impl=
         gain:   Scaling factor for the output tensor, or `None` to use default.
                 See `activation_funcs` for the default scaling of each activation function.
                 If unsure, consider specifying `1.0`.
+        clamp:  Clamp the output values to `[-clamp, +clamp]`, or `None` to disable
+                the clamping (default).
         impl:   Name of the implementation to use. Can be `"ref"` or `"cuda"` (default).
 
     Returns:
@@ -65,11 +69,11 @@ def fused_bias_act(x, b=None, axis=1, act='linear', alpha=None, gain=None, impl=
         'ref':  _fused_bias_act_ref,
         'cuda': _fused_bias_act_cuda,
     }
-    return impl_dict[impl](x=x, b=b, axis=axis, act=act, alpha=alpha, gain=gain)
+    return impl_dict[impl](x=x, b=b, axis=axis, act=act, alpha=alpha, gain=gain, clamp=clamp)
 
 #----------------------------------------------------------------------------
 
-def _fused_bias_act_ref(x, b, axis, act, alpha, gain):
+def _fused_bias_act_ref(x, b, axis, act, alpha, gain, clamp):
     """Slow reference implementation of `fused_bias_act()` using standard TensorFlow ops."""
 
     # Validate arguments.
@@ -93,11 +97,17 @@ def _fused_bias_act_ref(x, b, axis, act, alpha, gain):
     # Scale by gain.
     if gain != 1:
         x *= gain
+
+    # Clamp.
+    if clamp is not None:
+        clamp = np.asarray(clamp, dtype=x.dtype.name)
+        assert clamp.shape == () and clamp >= 0
+        x = tf.clip_by_value(x, -clamp, clamp)
     return x
 
 #----------------------------------------------------------------------------
 
-def _fused_bias_act_cuda(x, b, axis, act, alpha, gain):
+def _fused_bias_act_cuda(x, b, axis, act, alpha, gain, clamp):
     """Fast CUDA implementation of `fused_bias_act()` using custom ops."""
 
     # Validate arguments.
@@ -116,22 +126,29 @@ def _fused_bias_act_cuda(x, b, axis, act, alpha, gain):
     if act == 'linear' and b is None and gain == 1.0:
         return x
     if act_spec.cuda_idx is None:
-        return _fused_bias_act_ref(x=x, b=b, axis=axis, act=act, alpha=alpha, gain=gain)
+        return _fused_bias_act_ref(x=x, b=b, axis=axis, act=act, alpha=alpha, gain=gain, clamp=clamp)
 
-    # CUDA kernel.
-    cuda_kernel = _get_plugin().fused_bias_act
-    cuda_kwargs = dict(axis=axis, act=act_spec.cuda_idx, alpha=alpha, gain=gain)
+    # CUDA op.
+    cuda_op = _get_plugin().fused_bias_act
+    cuda_kwargs = dict(axis=int(axis), act=int(act_spec.cuda_idx), gain=float(gain))
+    if alpha is not None:
+        cuda_kwargs['alpha'] = float(alpha)
+    if clamp is not None:
+        clamp = np.asarray(clamp, dtype=x.dtype.name)
+        assert clamp.shape == () and clamp >= 0
+        cuda_kwargs['clamp'] = float(clamp.astype(np.float32))
+    def ref(tensor, name):
+        return tensor if act_spec.ref == name else empty_tensor
 
     # Forward pass: y = func(x, b).
     def func_y(x, b):
-        y = cuda_kernel(x=x, b=b, ref=empty_tensor, grad=0, **cuda_kwargs)
+        y = cuda_op(x=x, b=b, xref=empty_tensor, yref=empty_tensor, grad=0, **cuda_kwargs)
         y.set_shape(x.shape)
         return y
 
     # Backward pass: dx, db = grad(dy, x, y)
     def grad_dx(dy, x, y):
-        ref = {'x': x, 'y': y}[act_spec.ref]
-        dx = cuda_kernel(x=dy, b=empty_tensor, ref=ref, grad=1, **cuda_kwargs)
+        dx = cuda_op(x=dy, b=empty_tensor, xref=ref(x,'x'), yref=ref(y,'y'), grad=1, **cuda_kwargs)
         dx.set_shape(x.shape)
         return dx
     def grad_db(dx):
@@ -147,13 +164,11 @@ def _fused_bias_act_cuda(x, b, axis, act, alpha, gain):
 
     # Second order gradients: d_dy, d_x = grad2(d_dx, d_db, x, y)
     def grad2_d_dy(d_dx, d_db, x, y):
-        ref = {'x': x, 'y': y}[act_spec.ref]
-        d_dy = cuda_kernel(x=d_dx, b=d_db, ref=ref, grad=1, **cuda_kwargs)
+        d_dy = cuda_op(x=d_dx, b=d_db, xref=ref(x,'x'), yref=ref(y,'y'), grad=1, **cuda_kwargs)
         d_dy.set_shape(x.shape)
         return d_dy
     def grad2_d_x(d_dx, d_db, x, y):
-        ref = {'x': x, 'y': y}[act_spec.ref]
-        d_x = cuda_kernel(x=d_dx, b=d_db, ref=ref, grad=2, **cuda_kwargs)
+        d_x = cuda_op(x=d_dx, b=d_db, xref=ref(x,'x'), yref=ref(y,'y'), grad=2, **cuda_kwargs)
         d_x.set_shape(x.shape)
         return d_x
 

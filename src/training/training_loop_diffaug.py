@@ -3,6 +3,7 @@
 # https://nvlabs.github.io/stylegan2/license.html
 """Main training script."""
 
+import os
 import time
 import numpy as np
 import pickle 
@@ -95,7 +96,7 @@ def training_loop(
                 D.copy_compatible_trainables_from(D_partial)
                 Gs.copy_compatible_trainables_from(Gs_partial)
             else:
-                if resume_pkl is not None and resume_kimg == 0:
+                if resume_pkl is not None and os.path.isdir(resume_pkl):
                     resume_pkl, resume_kimg = misc.locate_latest_pkl(resume_pkl)
                 print(' Loading networks from "%s", kimg %.3g' % (resume_pkl, resume_kimg))
                 rG, rD, rGs = misc.load_pkl(resume_pkl)

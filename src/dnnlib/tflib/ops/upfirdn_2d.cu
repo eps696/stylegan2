@@ -1,8 +1,10 @@
-// Copyright (c) 2019, NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 //
-// This work is made available under the Nvidia Source Code License-NC.
-// To view a copy of this license, visit
-// https://nvlabs.github.io/stylegan2/license.html
+// NVIDIA CORPORATION and its licensors retain all intellectual property
+// and proprietary rights in and to this software, related documentation
+// and any modifications thereto.  Any use, reproduction, disclosure or
+// distribution of this software and related documentation without an express
+// license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #define EIGEN_USE_GPU
 #define __CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS__
@@ -21,10 +23,8 @@ using namespace tensorflow::shape_inference;
 
 static __host__ __device__ __forceinline__ int floorDiv(int a, int b)
 {
-    int c = a / b;
-    if (c * b > a)
-        c--;
-    return c;
+    int t = 1 - a / b;
+    return (a + t * b) / b - t;
 }
 
 //------------------------------------------------------------------------
@@ -269,19 +269,52 @@ struct UpFirDn2DOp : public OpKernel
         void* cudaKernel = (void*)UpFirDn2DKernel_large<T>;
         int tileOutW = -1;
         int tileOutH = -1;
-        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 7 && p.kernelH <= 7) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 7,7, 64,16>; tileOutW = 64; tileOutH = 16; }
-        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 6 && p.kernelH <= 6) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 6,6, 64,16>; tileOutW = 64; tileOutH = 16; }
-        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 5 && p.kernelH <= 5) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 5,5, 64,16>; tileOutW = 64; tileOutH = 16; }
-        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 4 && p.kernelH <= 4) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 4,4, 64,16>; tileOutW = 64; tileOutH = 16; }
-        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 3 && p.kernelH <= 3) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 3,3, 64,16>; tileOutW = 64; tileOutH = 16; }
-        if (p.upx == 2 && p.upy == 2 && p.downx == 1 && p.downy == 1 && p.kernelW <= 8 && p.kernelH <= 8) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 2,2, 1,1, 8,8, 64,16>; tileOutW = 64; tileOutH = 16; }
-        if (p.upx == 2 && p.upy == 2 && p.downx == 1 && p.downy == 1 && p.kernelW <= 6 && p.kernelH <= 6) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 2,2, 1,1, 6,6, 64,16>; tileOutW = 64; tileOutH = 16; }
-        if (p.upx == 2 && p.upy == 2 && p.downx == 1 && p.downy == 1 && p.kernelW <= 4 && p.kernelH <= 4) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 2,2, 1,1, 4,4, 64,16>; tileOutW = 64; tileOutH = 16; }
-        if (p.upx == 2 && p.upy == 2 && p.downx == 1 && p.downy == 1 && p.kernelW <= 2 && p.kernelH <= 2) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 2,2, 1,1, 2,2, 64,16>; tileOutW = 64; tileOutH = 16; }
-        if (p.upx == 1 && p.upy == 1 && p.downx == 2 && p.downy == 2 && p.kernelW <= 8 && p.kernelH <= 8) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 2,2, 8,8, 32,8>;  tileOutW = 32; tileOutH = 8;  }
-        if (p.upx == 1 && p.upy == 1 && p.downx == 2 && p.downy == 2 && p.kernelW <= 6 && p.kernelH <= 6) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 2,2, 6,6, 32,8>;  tileOutW = 32; tileOutH = 8;  }
-        if (p.upx == 1 && p.upy == 1 && p.downx == 2 && p.downy == 2 && p.kernelW <= 4 && p.kernelH <= 4) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 2,2, 4,4, 32,8>;  tileOutW = 32; tileOutH = 8;  }
-        if (p.upx == 1 && p.upy == 1 && p.downx == 2 && p.downy == 2 && p.kernelW <= 2 && p.kernelH <= 2) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 2,2, 2,2, 32,8>;  tileOutW = 32; tileOutH = 8;  }
+
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 7  && p.kernelH <= 7 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 7,7,  64,16>; tileOutW = 64;  tileOutH = 16; }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 6  && p.kernelH <= 6 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 6,6,  64,16>; tileOutW = 64;  tileOutH = 16; }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 5  && p.kernelH <= 5 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 5,5,  64,16>; tileOutW = 64;  tileOutH = 16; }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 4  && p.kernelH <= 4 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 4,4,  64,16>; tileOutW = 64;  tileOutH = 16; }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 3  && p.kernelH <= 3 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 3,3,  64,16>; tileOutW = 64;  tileOutH = 16; }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 24 && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 24,1, 128,8>; tileOutW = 128; tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 20 && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 20,1, 128,8>; tileOutW = 128; tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 16 && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 16,1, 128,8>; tileOutW = 128; tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 12 && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 12,1, 128,8>; tileOutW = 128; tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 8  && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 8,1,  128,8>; tileOutW = 128; tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 1  && p.kernelH <= 24) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 1,24, 32,32>; tileOutW = 32;  tileOutH = 32; }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 1  && p.kernelH <= 20) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 1,20, 32,32>; tileOutW = 32;  tileOutH = 32; }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 1  && p.kernelH <= 16) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 1,16, 32,32>; tileOutW = 32;  tileOutH = 32; }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 1  && p.kernelH <= 12) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 1,12, 32,32>; tileOutW = 32;  tileOutH = 32; }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 1  && p.kernelH <= 8 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,1, 1,8,  32,32>; tileOutW = 32;  tileOutH = 32; }
+
+        if (p.upx == 2 && p.upy == 2 && p.downx == 1 && p.downy == 1 && p.kernelW <= 8  && p.kernelH <= 8 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 2,2, 1,1, 8,8,  64,16>; tileOutW = 64;  tileOutH = 16; }
+        if (p.upx == 2 && p.upy == 2 && p.downx == 1 && p.downy == 1 && p.kernelW <= 6  && p.kernelH <= 6 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 2,2, 1,1, 6,6,  64,16>; tileOutW = 64;  tileOutH = 16; }
+        if (p.upx == 2 && p.upy == 2 && p.downx == 1 && p.downy == 1 && p.kernelW <= 4  && p.kernelH <= 4 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 2,2, 1,1, 4,4,  64,16>; tileOutW = 64;  tileOutH = 16; }
+        if (p.upx == 2 && p.upy == 2 && p.downx == 1 && p.downy == 1 && p.kernelW <= 2  && p.kernelH <= 2 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 2,2, 1,1, 2,2,  64,16>; tileOutW = 64;  tileOutH = 16; }
+        if (p.upx == 2 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 24 && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 2,1, 1,1, 24,1, 128,8>; tileOutW = 128; tileOutH = 8;  }
+        if (p.upx == 2 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 20 && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 2,1, 1,1, 20,1, 128,8>; tileOutW = 128; tileOutH = 8;  }
+        if (p.upx == 2 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 16 && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 2,1, 1,1, 16,1, 128,8>; tileOutW = 128; tileOutH = 8;  }
+        if (p.upx == 2 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 12 && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 2,1, 1,1, 12,1, 128,8>; tileOutW = 128; tileOutH = 8;  }
+        if (p.upx == 2 && p.upy == 1 && p.downx == 1 && p.downy == 1 && p.kernelW <= 8  && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 2,1, 1,1, 8,1,  128,8>; tileOutW = 128; tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 2 && p.downx == 1 && p.downy == 1 && p.kernelW <= 1  && p.kernelH <= 24) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,2, 1,1, 1,24, 32,32>; tileOutW = 32;  tileOutH = 32; }
+        if (p.upx == 1 && p.upy == 2 && p.downx == 1 && p.downy == 1 && p.kernelW <= 1  && p.kernelH <= 20) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,2, 1,1, 1,20, 32,32>; tileOutW = 32;  tileOutH = 32; }
+        if (p.upx == 1 && p.upy == 2 && p.downx == 1 && p.downy == 1 && p.kernelW <= 1  && p.kernelH <= 16) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,2, 1,1, 1,16, 32,32>; tileOutW = 32;  tileOutH = 32; }
+        if (p.upx == 1 && p.upy == 2 && p.downx == 1 && p.downy == 1 && p.kernelW <= 1  && p.kernelH <= 12) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,2, 1,1, 1,12, 32,32>; tileOutW = 32;  tileOutH = 32; }
+        if (p.upx == 1 && p.upy == 2 && p.downx == 1 && p.downy == 1 && p.kernelW <= 1  && p.kernelH <= 8 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,2, 1,1, 1,8,  32,32>; tileOutW = 32;  tileOutH = 32; }
+
+        if (p.upx == 1 && p.upy == 1 && p.downx == 2 && p.downy == 2 && p.kernelW <= 8  && p.kernelH <= 8 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 2,2, 8,8,  32,8 >; tileOutW = 32;  tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 2 && p.downy == 2 && p.kernelW <= 6  && p.kernelH <= 6 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 2,2, 6,6,  32,8 >; tileOutW = 32;  tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 2 && p.downy == 2 && p.kernelW <= 4  && p.kernelH <= 4 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 2,2, 4,4,  32,8 >; tileOutW = 32;  tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 2 && p.downy == 2 && p.kernelW <= 2  && p.kernelH <= 2 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 2,2, 2,2,  32,8 >; tileOutW = 32;  tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 2 && p.downy == 1 && p.kernelW <= 24 && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 2,1, 24,1, 64,8 >; tileOutW = 64;  tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 2 && p.downy == 1 && p.kernelW <= 20 && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 2,1, 20,1, 64,8 >; tileOutW = 64;  tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 2 && p.downy == 1 && p.kernelW <= 16 && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 2,1, 16,1, 64,8 >; tileOutW = 64;  tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 2 && p.downy == 1 && p.kernelW <= 12 && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 2,1, 12,1, 64,8 >; tileOutW = 64;  tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 2 && p.downy == 1 && p.kernelW <= 8  && p.kernelH <= 1 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 2,1, 8,1,  64,8 >; tileOutW = 64;  tileOutH = 8;  }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 2 && p.kernelW <= 1  && p.kernelH <= 24) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,2, 1,24, 32,16>; tileOutW = 32;  tileOutH = 16; }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 2 && p.kernelW <= 1  && p.kernelH <= 20) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,2, 1,20, 32,16>; tileOutW = 32;  tileOutH = 16; }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 2 && p.kernelW <= 1  && p.kernelH <= 16) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,2, 1,16, 32,16>; tileOutW = 32;  tileOutH = 16; }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 2 && p.kernelW <= 1  && p.kernelH <= 12) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,2, 1,12, 32,16>; tileOutW = 32;  tileOutH = 16; }
+        if (p.upx == 1 && p.upy == 1 && p.downx == 1 && p.downy == 2 && p.kernelW <= 1  && p.kernelH <= 8 ) { cudaKernel = (void*)UpFirDn2DKernel_small<T, 1,1, 1,2, 1,8,  32,16>; tileOutW = 32;  tileOutH = 16; }
 
         // Choose launch params.
         dim3 blockSize;

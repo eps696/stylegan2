@@ -1,12 +1,15 @@
-# Copyright (c) 2019, NVIDIA Corporation. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
-# This work is made available under the Nvidia Source Code License-NC.
-# To view a copy of this license, visit
-# https://nvlabs.github.io/stylegan2/license.html
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 """TensorFlow custom ops builder.
 """
 
+import glob
 import os
 import re
 import uuid
@@ -16,28 +19,32 @@ import shutil
 import tensorflow as tf
 from tensorflow.python.client import device_lib # pylint: disable=no-name-in-module
 
+from .. import util
+
 #----------------------------------------------------------------------------
 # Global options.
 
 cuda_cache_path = os.path.join(os.path.dirname(__file__), '_cudacache')
 cuda_cache_version_tag = 'v1'
-do_not_hash_included_headers = False # Speed up compilation by assuming that headers included by the CUDA code never change. Unsafe!
-verbose = True # Print status messages to stdout.
-
-compiler_bindir_search_path = [
-    'C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/VC/Tools/MSVC/14.14.26428/bin/Hostx64/x64',
-    'C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/VC/Tools/MSVC/14.16.27023/bin/Hostx64/x64',
-    'C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC/14.23.28105/bin/Hostx64/x64',
-    'C:/Program Files (x86)/Microsoft Visual Studio 14.0/vc/bin',
-]
+do_not_hash_included_headers = True # Speed up compilation by assuming that headers included by the CUDA code never change.
+verbose = False # Print status messages to stdout.
 
 #----------------------------------------------------------------------------
 # Internal helper funcs.
 
 def _find_compiler_bindir():
-    for compiler_path in compiler_bindir_search_path:
-        if os.path.isdir(compiler_path):
-            return compiler_path
+    hostx64_paths = sorted(glob.glob('C:/Program Files (x86)/Microsoft Visual Studio/*/Professional/VC/Tools/MSVC/*/bin/Hostx64/x64'), reverse=True)
+    if hostx64_paths != []:
+        return hostx64_paths[0]
+    hostx64_paths = sorted(glob.glob('C:/Program Files (x86)/Microsoft Visual Studio/*/BuildTools/VC/Tools/MSVC/*/bin/Hostx64/x64'), reverse=True)
+    if hostx64_paths != []:
+        return hostx64_paths[0]
+    hostx64_paths = sorted(glob.glob('C:/Program Files (x86)/Microsoft Visual Studio/*/Community/VC/Tools/MSVC/*/bin/Hostx64/x64'), reverse=True)
+    if hostx64_paths != []:
+        return hostx64_paths[0]
+    vc_bin_dir = 'C:/Program Files (x86)/Microsoft Visual Studio 14.0/vc/bin'
+    if os.path.isdir(vc_bin_dir):
+        return vc_bin_dir
     return None
 
 def _get_compute_cap(device):
@@ -62,8 +69,7 @@ def _run_cmd(cmd):
         raise RuntimeError('NVCC returned an error. See below for full command line and output log:\n\n%s\n\n%s' % (cmd, output))
 
 def _prepare_nvcc_cli(opts):
-    nvcc_path = 'nvcc'
-    cmd = nvcc_path + ' ' + opts.strip()
+    cmd = 'nvcc ' + opts.strip()
     cmd += ' --disable-warnings'
     cmd += ' --include-path "%s"' % tf.sysconfig.get_include()
     cmd += ' --include-path "%s"' % os.path.join(tf.sysconfig.get_include(), 'external', 'protobuf_archive', 'src')
@@ -86,7 +92,7 @@ def _prepare_nvcc_cli(opts):
 
 _plugin_cache = dict()
 
-def get_plugin(cuda_file):
+def get_plugin(cuda_file, extra_nvcc_options=[]):
     cuda_file_base = os.path.basename(cuda_file)
     cuda_file_name, cuda_file_ext = os.path.splitext(cuda_file_base)
 
@@ -125,12 +131,15 @@ def get_plugin(cuda_file):
         if os.name == 'nt':
             compile_opts += '"%s"' % os.path.join(tf.sysconfig.get_lib(), 'python', '_pywrap_tensorflow_internal.lib')
         elif os.name == 'posix':
-            compile_opts += '"%s"' % os.path.join(tf.sysconfig.get_lib(), 'python', '_pywrap_tensorflow_internal.so')
-            compile_opts += ' --compiler-options \'-fPIC -D_GLIBCXX_USE_CXX11_ABI=0\''
+            compile_opts += f' --compiler-options \'-fPIC\''
+            compile_opts += f' --compiler-options \'{" ".join(tf.sysconfig.get_compile_flags())}\''
+            compile_opts += f' --linker-options \'{" ".join(tf.sysconfig.get_link_flags())}\''
         else:
             assert False # not Windows or Linux, w00t?
-        compile_opts += ' --gpu-architecture=%s' % _get_cuda_gpu_arch_string()
+        compile_opts += f' --gpu-architecture={_get_cuda_gpu_arch_string()}'
         compile_opts += ' --use_fast_math'
+        for opt in extra_nvcc_options:
+            compile_opts += ' ' + opt
         nvcc_cmd = _prepare_nvcc_cli(compile_opts)
 
         # Hash build configuration.
@@ -139,16 +148,17 @@ def get_plugin(cuda_file):
         md5.update(('cuda_cache_version_tag: ' + cuda_cache_version_tag).encode('utf-8') + b'\n')
 
         # Compile if not already compiled.
+        cache_dir = util.make_cache_dir_path('tflib-cudacache') if cuda_cache_path is None else cuda_cache_path
         bin_file_ext = '.dll' if os.name == 'nt' else '.so'
-        bin_file = os.path.join(cuda_cache_path, cuda_file_name + '_' + md5.hexdigest() + bin_file_ext)
+        bin_file = os.path.join(cache_dir, cuda_file_name + '_' + md5.hexdigest() + bin_file_ext)
         if not os.path.isfile(bin_file):
             if verbose:
                 print('Compiling... ', end='', flush=True)
             with tempfile.TemporaryDirectory() as tmp_dir:
                 tmp_file = os.path.join(tmp_dir, cuda_file_name + '_tmp' + bin_file_ext)
                 _run_cmd(nvcc_cmd + ' "%s" --shared -o "%s" --keep --keep-dir "%s"' % (cuda_file, tmp_file, tmp_dir))
-                os.makedirs(cuda_cache_path, exist_ok=True)
-                intermediate_file = os.path.join(cuda_cache_path, cuda_file_name + '_' + uuid.uuid4().hex + '_tmp' + bin_file_ext)
+                os.makedirs(cache_dir, exist_ok=True)
+                intermediate_file = os.path.join(cache_dir, cuda_file_name + '_' + uuid.uuid4().hex + '_tmp' + bin_file_ext)
                 shutil.copyfile(tmp_file, intermediate_file)
                 os.rename(intermediate_file, bin_file) # atomic
 

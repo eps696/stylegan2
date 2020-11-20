@@ -129,7 +129,8 @@ def init_tf(config_dict: dict = None) -> None:
             os.environ[fields[1]] = str(value)
 
     # Create default TensorFlow session.
-    create_session(cfg, force_as_default=True)
+    sess = create_session(cfg, force_as_default=True)
+    return sess
 
 
 def assert_tf_initialized():
@@ -237,7 +238,7 @@ def convert_images_from_uint8(images, drange=[-1,1], nhwc_to_nchw=False):
     return images * ((drange[1] - drange[0]) / 255) + drange[0]
 
 
-def convert_images_to_uint8(images, drange=[-1,1], nchw_to_nhwc=False, shrink=1):
+def convert_images_to_uint8(images, drange=[-1,1], nchw_to_nhwc=False, shrink=1, uint8_cast=True):
     """Convert a minibatch of images from float32 to uint8 with configurable dynamic range.
     Can be used as an output transformation for Network.run().
     """
@@ -249,4 +250,6 @@ def convert_images_to_uint8(images, drange=[-1,1], nchw_to_nhwc=False, shrink=1)
         images = tf.transpose(images, [0, 2, 3, 1])
     scale = 255 / (drange[1] - drange[0])
     images = images * scale + (0.5 - drange[0] * scale)
-    return tf.saturate_cast(images, tf.uint8)
+    if uint8_cast:
+        images = tf.saturate_cast(images, tf.uint8)
+    return images

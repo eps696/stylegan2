@@ -1,8 +1,10 @@
-# Copyright (c) 2019, NVIDIA Corporation. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
-# This work is made available under the Nvidia Source Code License-NC.
-# To view a copy of this license, visit
-# https://nvlabs.github.io/stylegan2/license.html
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 """Custom TensorFlow ops for efficient resampling of 2D images."""
 
@@ -23,11 +25,11 @@ def upfirdn_2d(x, k, upx=1, upy=1, downx=1, downy=1, padx0=0, padx1=0, pady0=0, 
     and performs the following operations for each image, batched across
     `majorDim` and `minorDim`:
 
-    1. Pad the image with zeros by the specified number of pixels on each side
+    1. Upsample the image by inserting the zeros after each pixel (`upx`, `upy`).
+
+    2. Pad the image with zeros by the specified number of pixels on each side
        (`padx0`, `padx1`, `pady0`, `pady1`). Specifying a negative value
        corresponds to cropping the image.
-
-    2. Upsample the image by inserting the zeros after each pixel (`upx`, `upy`).
 
     3. Convolve the image with the specified 2D FIR filter (`k`), shrinking the
        image so that the footprint of all output pixels lies within the input image.
@@ -120,6 +122,7 @@ def _upfirdn_2d_cuda(x, k, upx, upy, downx, downy, padx0, padx1, pady0, pady1):
     outH = (inH * upy + pady0 + pady1 - kernelH) // downy + 1
     assert outW >= 1 and outH >= 1
 
+    cuda_op = _get_plugin().up_fir_dn2d
     kc = tf.constant(k, dtype=x.dtype)
     gkc = tf.constant(k[::-1, ::-1], dtype=x.dtype)
     gpadx0 = kernelW - padx0 - 1
@@ -129,11 +132,11 @@ def _upfirdn_2d_cuda(x, k, upx, upy, downx, downy, padx0, padx1, pady0, pady1):
 
     @tf.custom_gradient
     def func(x):
-        y = _get_plugin().up_fir_dn2d(x=x, k=kc, upx=upx, upy=upy, downx=downx, downy=downy, padx0=padx0, padx1=padx1, pady0=pady0, pady1=pady1)
+        y = cuda_op(x=x, k=kc, upx=int(upx), upy=int(upy), downx=int(downx), downy=int(downy), padx0=int(padx0), padx1=int(padx1), pady0=int(pady0), pady1=int(pady1))
         y.set_shape([majorDim, outH, outW, minorDim])
         @tf.custom_gradient
         def grad(dy):
-            dx = _get_plugin().up_fir_dn2d(x=dy, k=gkc, upx=downx, upy=downy, downx=upx, downy=upy, padx0=gpadx0, padx1=gpadx1, pady0=gpady0, pady1=gpady1)
+            dx = cuda_op(x=dy, k=gkc, upx=int(downx), upy=int(downy), downx=int(upx), downy=int(upy), padx0=int(gpadx0), padx1=int(gpadx1), pady0=int(gpady0), pady1=int(gpady1))
             dx.set_shape([majorDim, inH, inW, minorDim])
             return dx, func
         return y, grad
@@ -141,7 +144,7 @@ def _upfirdn_2d_cuda(x, k, upx, upy, downx, downy, padx0, padx1, pady0, pady1):
 
 #----------------------------------------------------------------------------
 
-def filter_2d(x, k, gain=1, data_format='NCHW', impl='cuda'):
+def filter_2d(x, k, gain=1, padding=0, data_format='NCHW', impl='cuda'):
     r"""Filter a batch of 2D images with the given FIR filter.
 
     Accepts a batch of 2D images of the shape `[N, C, H, W]` or `[N, H, W, C]`
@@ -153,6 +156,7 @@ def filter_2d(x, k, gain=1, data_format='NCHW', impl='cuda'):
         x:            Input tensor of the shape `[N, C, H, W]` or `[N, H, W, C]`.
         k:            FIR filter of the shape `[firH, firW]` or `[firN]` (separable).
         gain:         Scaling factor for signal magnitude (default: 1.0).
+        padding:      Number of pixels to pad or crop the output on each side (default: 0).
         data_format:  `'NCHW'` or `'NHWC'` (default: `'NCHW'`).
         impl:         Name of the implementation to use. Can be `"ref"` or `"cuda"` (default).
 
@@ -160,13 +164,16 @@ def filter_2d(x, k, gain=1, data_format='NCHW', impl='cuda'):
         Tensor of the same shape and datatype as `x`.
     """
 
-    k = _setup_kernel(k) * gain
-    p = k.shape[0] - 1
-    return _simple_upfirdn_2d(x, k, pad0=(p+1)//2, pad1=p//2, data_format=data_format, impl=impl)
+    assert isinstance(padding, int)
+    k = _FilterKernel(k=k, gain=gain)
+    assert k.w == k.h
+    pad0 = k.w // 2 + padding
+    pad1 = (k.w - 1) // 2 + padding
+    return _simple_upfirdn_2d(x, k, pad0=pad0, pad1=pad1, data_format=data_format, impl=impl)
 
 #----------------------------------------------------------------------------
 
-def upsample_2d(x, k=None, factor=2, gain=1, data_format='NCHW', impl='cuda'):
+def upsample_2d(x, k=None, factor=2, gain=1, padding=0, data_format='NCHW', impl='cuda'):
     r"""Upsample a batch of 2D images with the given filter.
 
     Accepts a batch of 2D images of the shape `[N, C, H, W]` or `[N, H, W, C]`
@@ -182,6 +189,7 @@ def upsample_2d(x, k=None, factor=2, gain=1, data_format='NCHW', impl='cuda'):
                       upsampling.
         factor:       Integer upsampling factor (default: 2).
         gain:         Scaling factor for signal magnitude (default: 1.0).
+        padding:      Number of pixels to pad or crop the output on each side (default: 0).
         data_format:  `'NCHW'` or `'NHWC'` (default: `'NCHW'`).
         impl:         Name of the implementation to use. Can be `"ref"` or `"cuda"` (default).
 
@@ -191,15 +199,16 @@ def upsample_2d(x, k=None, factor=2, gain=1, data_format='NCHW', impl='cuda'):
     """
 
     assert isinstance(factor, int) and factor >= 1
-    if k is None:
-        k = [1] * factor
-    k = _setup_kernel(k) * (gain * (factor ** 2))
-    p = k.shape[0] - factor
-    return _simple_upfirdn_2d(x, k, up=factor, pad0=(p+1)//2+factor-1, pad1=p//2, data_format=data_format, impl=impl)
+    assert isinstance(padding, int)
+    k = _FilterKernel(k if k is not None else [1] * factor, gain * (factor ** 2))
+    assert k.w == k.h
+    pad0 = (k.w + factor - 1) // 2 + padding
+    pad1 = (k.w - factor) // 2 + padding
+    return _simple_upfirdn_2d(x, k, up=factor, pad0=pad0, pad1=pad1, data_format=data_format, impl=impl)
 
 #----------------------------------------------------------------------------
 
-def downsample_2d(x, k=None, factor=2, gain=1, data_format='NCHW', impl='cuda'):
+def downsample_2d(x, k=None, factor=2, gain=1, padding=0, data_format='NCHW', impl='cuda'):
     r"""Downsample a batch of 2D images with the given filter.
 
     Accepts a batch of 2D images of the shape `[N, C, H, W]` or `[N, H, W, C]`
@@ -214,6 +223,7 @@ def downsample_2d(x, k=None, factor=2, gain=1, data_format='NCHW', impl='cuda'):
                       The default is `[1] * factor`, which corresponds to average pooling.
         factor:       Integer downsampling factor (default: 2).
         gain:         Scaling factor for signal magnitude (default: 1.0).
+        padding:      Number of pixels to pad or crop the output on each side (default: 0).
         data_format:  `'NCHW'` or `'NHWC'` (default: `'NCHW'`).
         impl:         Name of the implementation to use. Can be `"ref"` or `"cuda"` (default).
 
@@ -223,15 +233,16 @@ def downsample_2d(x, k=None, factor=2, gain=1, data_format='NCHW', impl='cuda'):
     """
 
     assert isinstance(factor, int) and factor >= 1
-    if k is None:
-        k = [1] * factor
-    k = _setup_kernel(k) * gain
-    p = k.shape[0] - factor
-    return _simple_upfirdn_2d(x, k, down=factor, pad0=(p+1)//2, pad1=p//2, data_format=data_format, impl=impl)
+    assert isinstance(padding, int)
+    k = _FilterKernel(k if k is not None else [1] * factor, gain)
+    assert k.w == k.h
+    pad0 = (k.w - factor + 1) // 2 + padding * factor
+    pad1 = (k.w - factor) // 2 + padding * factor
+    return _simple_upfirdn_2d(x, k, down=factor, pad0=pad0, pad1=pad1, data_format=data_format, impl=impl)
 
 #----------------------------------------------------------------------------
 
-def upsample_conv_2d(x, w, k=None, factor=2, gain=1, data_format='NCHW', impl='cuda'):
+def upsample_conv_2d(x, w, k=None, factor=2, gain=1, padding=0, data_format='NCHW', impl='cuda'):
     r"""Fused `upsample_2d()` followed by `tf.nn.conv2d()`.
 
     Padding is performed only once at the beginning, not between the operations.
@@ -247,6 +258,7 @@ def upsample_conv_2d(x, w, k=None, factor=2, gain=1, data_format='NCHW', impl='c
                       upsampling.
         factor:       Integer upsampling factor (default: 2).
         gain:         Scaling factor for signal magnitude (default: 1.0).
+        padding:      Number of pixels to pad or crop the output on each side (default: 0).
         data_format:  `'NCHW'` or `'NHWC'` (default: `'NCHW'`).
         impl:         Name of the implementation to use. Can be `"ref"` or `"cuda"` (default).
 
@@ -256,44 +268,49 @@ def upsample_conv_2d(x, w, k=None, factor=2, gain=1, data_format='NCHW', impl='c
     """
 
     assert isinstance(factor, int) and factor >= 1
+    assert isinstance(padding, int)
 
     # Check weight shape.
     w = tf.convert_to_tensor(w)
-    assert w.shape.rank == 4
-    convH = w.shape[0].value
-    convW = w.shape[1].value
+    ch, cw, _inC, _outC = w.shape.as_list()
     inC = _shape(w, 2)
     outC = _shape(w, 3)
-    assert convW == convH
+    assert cw == ch
+
+    # Fast path for 1x1 convolution.
+    if cw == 1 and ch == 1:
+        x = tf.nn.conv2d(x, w, data_format=data_format, strides=[1,1,1,1], padding='VALID')
+        x = upsample_2d(x, k, factor=factor, gain=gain, padding=padding, data_format=data_format, impl=impl)
+        return x
 
     # Setup filter kernel.
-    if k is None:
-        k = [1] * factor
-    k = _setup_kernel(k) * (gain * (factor ** 2))
-    p = (k.shape[0] - factor) - (convW - 1)
+    k = _FilterKernel(k if k is not None else [1] * factor, gain * (factor ** 2))
+    assert k.w == k.h
 
     # Determine data dimensions.
     if data_format == 'NCHW':
         stride = [1, 1, factor, factor]
-        output_shape = [_shape(x, 0), outC, (_shape(x, 2) - 1) * factor + convH, (_shape(x, 3) - 1) * factor + convW]
+        output_shape = [_shape(x, 0), outC, (_shape(x, 2) - 1) * factor + ch, (_shape(x, 3) - 1) * factor + cw]
         num_groups = _shape(x, 1) // inC
     else:
         stride = [1, factor, factor, 1]
-        output_shape = [_shape(x, 0), (_shape(x, 1) - 1) * factor + convH, (_shape(x, 2) - 1) * factor + convW, outC]
+        output_shape = [_shape(x, 0), (_shape(x, 1) - 1) * factor + ch, (_shape(x, 2) - 1) * factor + cw, outC]
         num_groups = _shape(x, 3) // inC
 
     # Transpose weights.
-    w = tf.reshape(w, [convH, convW, inC, num_groups, -1])
+    w = tf.reshape(w, [ch, cw, inC, num_groups, -1])
     w = tf.transpose(w[::-1, ::-1], [0, 1, 4, 3, 2])
-    w = tf.reshape(w, [convH, convW, -1, num_groups * inC])
+    w = tf.reshape(w, [ch, cw, -1, num_groups * inC])
 
     # Execute.
     x = tf.nn.conv2d_transpose(x, w, output_shape=output_shape, strides=stride, padding='VALID', data_format=data_format)
-    return _simple_upfirdn_2d(x, k, pad0=(p+1)//2+factor-1, pad1=p//2+1, data_format=data_format, impl=impl)
+    pad0 = (k.w + factor - cw) // 2 + padding
+    pad1 = (k.w - factor - cw + 3) // 2 + padding
+    return _simple_upfirdn_2d(x, k, pad0=pad0, pad1=pad1, data_format=data_format, impl=impl)
 
 #----------------------------------------------------------------------------
 
-def conv_downsample_2d(x, w, k=None, factor=2, gain=1, data_format='NCHW', impl='cuda'):
+def conv_downsample_2d(x, w, k=None, factor=2, gain=1, padding=0, data_format='NCHW', impl='cuda'):
     r"""Fused `tf.nn.conv2d()` followed by `downsample_2d()`.
 
     Padding is performed only once at the beginning, not between the operations.
@@ -308,6 +325,7 @@ def conv_downsample_2d(x, w, k=None, factor=2, gain=1, data_format='NCHW', impl=
                       The default is `[1] * factor`, which corresponds to average pooling.
         factor:       Integer downsampling factor (default: 2).
         gain:         Scaling factor for signal magnitude (default: 1.0).
+        padding:      Number of pixels to pad or crop the output on each side (default: 0).
         data_format:  `'NCHW'` or `'NHWC'` (default: `'NCHW'`).
         impl:         Name of the implementation to use. Can be `"ref"` or `"cuda"` (default).
 
@@ -317,22 +335,78 @@ def conv_downsample_2d(x, w, k=None, factor=2, gain=1, data_format='NCHW', impl=
     """
 
     assert isinstance(factor, int) and factor >= 1
+    assert isinstance(padding, int)
+
+    # Check weight shape.
     w = tf.convert_to_tensor(w)
-    convH, convW, _inC, _outC = w.shape.as_list()
-    assert convW == convH
-    if k is None:
-        k = [1] * factor
-    k = _setup_kernel(k) * gain
-    p = (k.shape[0] - factor) + (convW - 1)
+    ch, cw, _inC, _outC = w.shape.as_list()
+    assert cw == ch
+
+    # Fast path for 1x1 convolution.
+    if cw == 1 and ch == 1:
+        x = downsample_2d(x, k, factor=factor, gain=gain, padding=padding, data_format=data_format, impl=impl)
+        x = tf.nn.conv2d(x, w, data_format=data_format, strides=[1,1,1,1], padding='VALID')
+        return x
+
+    # Setup filter kernel.
+    k = _FilterKernel(k if k is not None else [1] * factor, gain)
+    assert k.w == k.h
+
+    # Determine stride.
     if data_format == 'NCHW':
         s = [1, 1, factor, factor]
     else:
         s = [1, factor, factor, 1]
-    x = _simple_upfirdn_2d(x, k, pad0=(p+1)//2, pad1=p//2, data_format=data_format, impl=impl)
+
+    # Execute.
+    pad0 = (k.w - factor + cw) // 2 + padding * factor
+    pad1 = (k.w - factor + cw - 1) // 2 + padding * factor
+    x = _simple_upfirdn_2d(x, k, pad0=pad0, pad1=pad1, data_format=data_format, impl=impl)
     return tf.nn.conv2d(x, w, strides=s, padding='VALID', data_format=data_format)
 
 #----------------------------------------------------------------------------
-# Internal helper funcs.
+# Internal helpers.
+
+class _FilterKernel:
+    def __init__(self, k, gain=1):
+        k = np.asarray(k, dtype=np.float32)
+        k /= np.sum(k)
+
+        # Separable.
+        if k.ndim == 1 and k.size >= 8:
+            self.w = k.size
+            self.h = k.size
+            self.kx = k[np.newaxis, :]
+            self.ky = k[:, np.newaxis] * gain
+            self.kxy = None
+
+        # Non-separable.
+        else:
+            if k.ndim == 1:
+                k = np.outer(k, k)
+            assert k.ndim == 2
+            self.w = k.shape[1]
+            self.h = k.shape[0]
+            self.kx = None
+            self.ky = None
+            self.kxy = k * gain
+
+def _simple_upfirdn_2d(x, k, up=1, down=1, pad0=0, pad1=0, data_format='NCHW', impl='cuda'):
+    assert isinstance(k, _FilterKernel)
+    assert data_format in ['NCHW', 'NHWC']
+    assert x.shape.rank == 4
+    y = x
+    if data_format == 'NCHW':
+        y = tf.reshape(y, [-1, _shape(y, 2), _shape(y, 3), 1])
+    if k.kx is not None:
+        y = upfirdn_2d(y, k.kx, upx=up, downx=down, padx0=pad0, padx1=pad1, impl=impl)
+    if k.ky is not None:
+        y = upfirdn_2d(y, k.ky, upy=up, downy=down, pady0=pad0, pady1=pad1, impl=impl)
+    if k.kxy is not None:
+        y = upfirdn_2d(y, k.kxy, upx=up, upy=up, downx=down, downy=down, padx0=pad0, padx1=pad1, pady0=pad0, pady1=pad1, impl=impl)
+    if data_format == 'NCHW':
+        y = tf.reshape(y, [-1, _shape(x, 1), _shape(y, 1), _shape(y, 2)])
+    return y
 
 def _shape(tf_expr, dim_idx):
     if tf_expr.shape.rank is not None:
@@ -340,25 +414,5 @@ def _shape(tf_expr, dim_idx):
         if dim is not None:
             return dim
     return tf.shape(tf_expr)[dim_idx]
-
-def _setup_kernel(k):
-    k = np.asarray(k, dtype=np.float32)
-    if k.ndim == 1:
-        k = np.outer(k, k)
-    k /= np.sum(k)
-    assert k.ndim == 2
-    assert k.shape[0] == k.shape[1]
-    return k
-
-def _simple_upfirdn_2d(x, k, up=1, down=1, pad0=0, pad1=0, data_format='NCHW', impl='cuda'):
-    assert data_format in ['NCHW', 'NHWC']
-    assert x.shape.rank == 4
-    y = x
-    if data_format == 'NCHW':
-        y = tf.reshape(y, [-1, _shape(y, 2), _shape(y, 3), 1])
-    y = upfirdn_2d(y, k, upx=up, upy=up, downx=down, downy=down, padx0=pad0, padx1=pad1, pady0=pad0, pady1=pad1, impl=impl)
-    if data_format == 'NCHW':
-        y = tf.reshape(y, [-1, _shape(x, 1), _shape(y, 1), _shape(y, 2)])
-    return y
 
 #----------------------------------------------------------------------------

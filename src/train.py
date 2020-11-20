@@ -20,7 +20,7 @@ def run(dataset, train_dir, config, d_aug, diffaug_policy, cond, ops, jpg_data, 
     # dataset (tfrecords) - preprocess or get 
     tfr_files = file_list(os.path.dirname(dataset), 'tfr')
     tfr_files = [f for f in tfr_files if basename(dataset) in f]
-    if len(tfr_files) == 0:
+    if len(tfr_files) == 0 or os.stat(tfr_files[0]).st_size == 0:
         tfr_file, total_samples = create_from_images(dataset, jpg=jpg_data)
     else:
         tfr_file = tfr_files[0]
@@ -129,7 +129,7 @@ def main():
     # main
     parser.add_argument('--dataset', required=True, help='Training dataset path', metavar='DIR')
     parser.add_argument('--train_dir', default='train', help='Root directory for training results (default: %(default)s)', metavar='DIR')
-    parser.add_argument('--resume', default=None, help='Resume checkpoint path. None = from scratch', metavar='DIR')
+    parser.add_argument('--resume', default=None, help='Resume checkpoint path. None = from scratch')
     parser.add_argument('--resume_kimg', default=0, type=int, help='Resume training from (in thousands of images)', metavar='N')
     parser.add_argument('--lod_step_kimg', default=20, type=int, help='Thousands of images per LOD/layer step (default: %(default)s)', metavar='N')
     parser.add_argument('--finetune', action='store_true', help='finetune trained model (start from 1e4 kimg, stop when enough)')
