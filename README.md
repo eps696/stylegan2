@@ -4,7 +4,8 @@
 
 This version of famous [StyleGAN2] is intended mostly for fellow artists, who rarely look at scientific metrics, but rather need a working creative tool. At least, this is what I use daily myself. 
 Tested on Tensorflow 1.14, requires `pyturbojpeg` for JPG support. For more explicit details refer to the original implementations. 
-Note about [StyleGAN2-ada]: While its feature list sounded very promising, out-of-the-box tests with extremely small datasets (50~100 images) did not prove it; so meanwhile i stick to this repo with Diff Augmentation.
+
+Note about [StyleGAN2-ada]: While its feature list sounded very promising, out-of-the-box tests have failed on extremely small datasets (50~100 images); so meanwhile i stick to this repo with Diff Augmentation.
 
 ## Features
 * inference (image generation) in arbitrary resolution (may cause artifacts!)
