@@ -4,6 +4,7 @@
 
 This version of famous [StyleGAN2] is intended mostly for fellow artists, who rarely look at scientific metrics, but rather need a working creative tool. At least, this is what I use daily myself. 
 Tested on Tensorflow 1.14, requires `pyturbojpeg` for JPG support. For more explicit details refer to the original implementations. 
+Note about [StyleGAN2-ada]: While its feature list sounded very promising, out-of-the-box tests with extremely small datasets (50~100 images) did not prove it; so meanwhile i stick to this repo with Diff Augmentation.
 
 ## Features
 * inference (image generation) in arbitrary resolution (may cause artifacts!)
@@ -92,6 +93,7 @@ This will load saved dlatent points from `_in/mynpy` and produce a smooth looped
 This will load base dlatent point from `_in/blonde458.npy` and move it along latent direction vectors from `_in/vectors_ffhq`, one by one. Result is saved as looped video. 
 
 [StyleGAN2]: <https://github.com/NVlabs/stylegan2>
+[StyleGAN2-ada]: <https://github.com/NVlabs/stylegan2-ada>
 [Peter Baylies]: <https://github.com/pbaylies/stylegan2>
 [skyflynil]: <https://github.com/skyflynil/stylegan2>
 [Data-Efficient GANs]: <https://github.com/mit-han-lab/data-efficient-gans>
