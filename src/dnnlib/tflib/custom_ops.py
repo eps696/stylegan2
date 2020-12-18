@@ -131,12 +131,12 @@ def get_plugin(cuda_file, extra_nvcc_options=[]):
         if os.name == 'nt':
             compile_opts += '"%s"' % os.path.join(tf.sysconfig.get_lib(), 'python', '_pywrap_tensorflow_internal.lib')
         elif os.name == 'posix':
-            compile_opts += f' --compiler-options \'-fPIC\''
-            compile_opts += f' --compiler-options \'{" ".join(tf.sysconfig.get_compile_flags())}\''
-            compile_opts += f' --linker-options \'{" ".join(tf.sysconfig.get_link_flags())}\''
+            compile_opts += ' --compiler-options \'-fPIC\''
+            compile_opts += ' --compiler-options \'%s\'' % " ".join(tf.sysconfig.get_compile_flags())
+            compile_opts += ' --linker-options \'%s\'' % " ".join(tf.sysconfig.get_link_flags())
         else:
             assert False # not Windows or Linux, w00t?
-        compile_opts += f' --gpu-architecture={_get_cuda_gpu_arch_string()}'
+        compile_opts += ' --gpu-architecture=%s' % _get_cuda_gpu_arch_string()
         compile_opts += ' --use_fast_math'
         for opt in extra_nvcc_options:
             compile_opts += ' ' + opt
