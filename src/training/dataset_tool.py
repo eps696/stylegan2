@@ -106,40 +106,74 @@ class TFRecordExporter:
         self.close()
 
 def img_list(path):
-    files = [os.path.join(path, file_i) for file_i in os.listdir(path)
-            if file_i.lower().endswith('.jpg') or file_i.lower().endswith('.jpeg') or file_i.lower().endswith('.png')]
+    files = [os.path.join(path, f) for f in os.listdir(path)]
+    files = [f for f in files if os.path.splitext(f.lower())[1][1:] in ['jpg', 'jpeg', 'png', 'ppm', 'tif']]
     return sorted([f for f in files if os.path.isfile(f)])
 
-def create_from_images(dataset, jpg=False, shuffle=True, size=None):
-    assert os.path.isdir(dataset)
-    image_filenames = sorted(img_list(dataset))
-    assert len(image_filenames) > 0, ' No input images found!'
+def create_from_images(datadir, jpg=False, shuffle=True, size=None):
+    assert os.path.isdir(datadir)
+    imgs = sorted(img_list(datadir))
+    assert len(imgs) > 0, ' No input images found!'
 
-    sample_img = np.asarray(PIL.Image.open(image_filenames[0]))
+    sample_img = np.asarray(PIL.Image.open(imgs[0]))
     sample_shape = sample_img.shape
     channels = sample_shape[2] if sample_img.ndim == 3 else 1
     assert channels in [1,3,4], ' Weird color dim: %d' % channels
-    print(' Making dataset', dataset, sample_shape)
+    print(' Making dataset ..', datadir, sample_shape)
     if jpg is True: print(' Loading JPG as is!')
 
-    with TFRecordExporter(dataset, len(image_filenames)) as tfr:
-        order = tfr.choose_shuffled_order() if shuffle else np.arange(len(image_filenames))
+    with TFRecordExporter(datadir, len(imgs)) as tfr:
+        order = tfr.choose_shuffled_order() if shuffle else np.arange(len(imgs))
         pbar = ProgressBar(order.size)
         for idx in range(order.size):
-            img_path = image_filenames[order[idx]]
+            img_path = imgs[order[idx]]
             tfr.add_image(img_path, jpg=jpg, size=size)
             pbar.upd()
-    return tfr.tfr_file, len(image_filenames)
+    return tfr.tfr_file, len(imgs)
 
+def create_from_image_folders(datadir, jpg=False, shuffle=True, size=None):
+    assert os.path.isdir(datadir)
+    imgs = []
+    labels = []
+    for root, subdirs, files in os.walk(datadir):
+        for i, subdir in enumerate(subdirs):
+            tmp_list = img_list(os.path.join(root, subdir))
+            imgs = imgs + tmp_list
+            labels = labels + [i] * len(tmp_list)
+    labels = np.array(labels)  
+    onehot = np.zeros((labels.size, np.max(labels) + 1), dtype=np.float32)
+    onehot[np.arange(labels.size), labels] = 1.
+
+    assert len(imgs) > 0, ' No input images found!'
+    sample_img = np.asarray(PIL.Image.open(imgs[0]))
+    sample_shape = sample_img.shape
+    channels = sample_shape[2] if sample_img.ndim == 3 else 1
+    assert channels in [1,3,4], ' Weird color dim: %d' % channels
+    print(' Making dataset ..', datadir, sample_shape, '%d labels' % (np.max(labels)+1))
+    if jpg is True: print(' Loading JPG as is!')
+
+    with TFRecordExporter(datadir, len(imgs)) as tfr:
+        order = tfr.choose_shuffled_order() if shuffle else np.arange(len(imgs))
+        pbar = ProgressBar(order.size)
+        for idx in range(order.size):
+            img_path = imgs[order[idx]]
+            tfr.add_image(img_path, jpg=jpg, size=size)
+            pbar.upd()
+        tfr.add_labels(onehot[order])
+    return tfr.tfr_file, len(imgs)
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', required=True, help='Directory containing the images')
     parser.add_argument('--shuffle', type=bool, default=True, help='Randomize image order (default: 1)')
-    parser.add_argument('--jpg', action='store_true', help='save as jpg directly from file') # , type=bool, default=False
+    parser.add_argument('--jpg', action='store_true', help='save as jpg directly from file')
+    parser.add_argument('--labels', action='store_true', help='use folders to generate labels')
     args = parser.parse_args()
 
-    create_from_images(args.dataset, args.jpg, args.shuffle)
+    if args.labels is True:
+        create_from_image_folders(args.dataset, args.jpg, args.shuffle)
+    else:
+        create_from_images(args.dataset, args.jpg, args.shuffle)
 
 if __name__ == "__main__":
     main()
