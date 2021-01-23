@@ -86,12 +86,12 @@ This will load `ffhq-1024.pkl` from `model` directory and make a 1280x720 px vid
 ```
  gen.bat ffhq-1024 3072-1024 500-20 -n 3-1
 ```
-This will produce animated composition of 3 independent frames, blended together horizontally (like image in the repo header). Option `--splitfine` controls boundary fineness (0 = smoothest). 
+This will produce animated composition of 3 independent frames, blended together horizontally (like the image in the repo header). Argument `--splitfine X` controls boundary fineness (0 = smoothest). 
 Instead of simple frame splitting, one can load external mask(s) from b/w image file (or folder with file sequence):
 ```
  gen.bat ffhq-1024 3072-1024 500-20 --latmask <path>
 ```
-Arguments `--digress X` would add some animated funky displacements with X strength. Arguments `--trunc Y` controls truncation psi parameter, as usual. 
+Arguments `--digress X` would add some animated funky displacements with X strength. Arguments `--trunc X` controls truncation psi parameter, as usual. 
 
 **NB**: Windows batch-files support only 9 command arguments; if you need more options, you have to edit batch-file itself.
 
@@ -105,7 +105,7 @@ The result (found dlatent points as Numpy arrays in `*.npy` files, and video/sti
 ```
  play_dlatents.bat ffhq-1024 mynpy 50 1920-1080
 ```
-This will load saved dlatent points from `_in/mynpy` and produce a smooth looped animation between them (with resolution 1920x1080 and interpolation step of 50 frames). `mynpy` may be a file or a directory with `*.npy` files. To select only few frames from a sequence `somename.npy`, create text file with comma-delimited frame numbers and save it as `somename.txt` in the same directory (check examples for FFHQ model). You can also "style" the result: setting `--style_npy_file blonde458.npy` will load dlatent from `blonde458.npy` and apply it to higher layers, producing some visual similarity. `--cubic` smoothing and `--digress` displacements are also applicable here. 
+This will load saved dlatent points from `_in/mynpy` and produce a smooth looped animation between them (with resolution 1920x1080 and interpolation step of 50 frames). `mynpy` may be a file or a directory with `*.npy` files. To select only few frames from a sequence `somename.npy`, create text file with comma-delimited frame numbers and save it as `somename.txt` in the same directory (check examples for FFHQ model). You can also "style" the result: setting `--style_npy_file blonde458.npy` will load dlatent from `blonde458.npy` and apply it to higher layers, producing some visual similarity. `--cubic` smoothing and `--digress X` displacements are also applicable here. 
 
 * Generate animation from saved dlatent point and feature directions (say, aging/smiling/etc for faces model):
 ```
@@ -132,7 +132,7 @@ This option works with complete (G/D/Gs) models only, since its purpose is only 
 ```
  model_convert.bat snapshot-1024-xxx.pkl --res 1024-768
 ```
-This will produce working non-square 1024x768 model. Opposite to the method above, this one doesn't change layer count. This is also experimental feature (as stated by the author @Aydao), using some voluntary logic, so works only with basic resolutions.
+This will produce working non-square 1024x768 model. Opposite to the method above, this one doesn't change layer count. This is experimental feature (as stated by the author @Aydao), also using some voluntary logic, so works only with basic resolutions.
 
 * Combine lower layers from one model with higher layers from another:
 ```
