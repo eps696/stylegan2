@@ -12,12 +12,14 @@ from dnnlib.tflib.ops.upfirdn_2d import upsample_2d
 
 from .networks_stylegan2 import G_mapping, conv2d_layer, apply_bias_act, modulated_conv2d_layer
 
-from util.utilgan import hw_scales, fix_size
+from util.utilgan import hw_scales, fix_size, multimask
 
 # Main generator network -- same as original
 def G_main(
     latents_in,                                         # First input: Latent vectors (Z) [minibatch, latent_size].
     labels_in,                                          # Second input: Conditioning labels [minibatch, label_size].
+    latmask,                                        # mask for split-frame latents blending
+    dconst,                                         # initial (const) layer displacement
     truncation_psi          = 0.5,                      # Style strength multiplier for the truncation trick. None = disable.
     truncation_cutoff       = None,                     # Number of layers for which to apply the truncation trick. None = disable.
     truncation_psi_val      = None,                     # Value for truncation_psi to use during validation.
@@ -109,7 +111,7 @@ def G_main(
     if 'lod' in components.synthesis.vars:
         deps.append(tf.assign(components.synthesis.vars['lod'], lod_in))
     with tf.control_dependencies(deps):
-        images_out = components.synthesis.get_output_for(dlatents, is_training=is_training, force_clean_graph=is_template_graph, **kwargs)
+        images_out = components.synthesis.get_output_for(dlatents, latmask, dconst, is_training=is_training, force_clean_graph=is_template_graph, **kwargs)
 
     # Return requested outputs.
     images_out = tf.identity(images_out, name='images_out')
@@ -120,12 +122,18 @@ def G_main(
 # StyleGAN2 synthesis network. Implements skip connections and residual nets (Figure 7), but no progressive growing.
 def G_synthesis_stylegan2(
     dlatents_in,                        # Input: Disentangled latents (W) [minibatch, num_layers, dlatent_size].
+    latmask,                        # mask for split-frame latents blending
+    dconst,                         # initial (const) layer displacement
+    latmask_res         = [1,1],      # resolution of external mask for blending
+    countW              = 1,          # frame split count by width
+    countH              = 1,          # frame split count by height
+    splitfine           = 0.,         # frame split edge sharpness (float from 0)
+    size                = None,       # Output size
+    scale_type          = None,       # scaling way: fit, centr, side, pad, padside
+    init_res            = [4,4],      # Initial (minimum) resolution for progressive training
     dlatent_size        = 512,          # Disentangled latent (W) dimensionality.
     num_channels        = 3,            # Number of output color channels.
     resolution          = 1024,         # Base model resolution (corresponding to the layer count)
-    init_res            = [4,4],      # Initial (minimal) resolution for progressive training
-    size                = None,       # Output size
-    scale_type          = None,       # Arbitrary size: fit (scaling), reflect (pad), symmetric (pad)
     fmap_base           = 16 << 10,     # Overall multiplier for the number of feature maps.
     fmap_decay          = 1.0,          # log2 feature map reduction when doubling the resolution.
     fmap_min            = 1,            # Minimum number of feature maps in any layer.
@@ -152,6 +160,11 @@ def G_synthesis_stylegan2(
     hws = hw_scales(size, custom_res, res_log2 - 2, keep_first_layers, verbose)
     if verbose: print(hws, '..', custom_res, res_log2-1)
     
+    # multi latent blending
+    latmask.set_shape([None, *latmask_res])
+    dconst.set_shape([None, dlatent_size, *init_res])
+    splitfine = tf.cast(splitfine, tf.float32)
+
     def nf(stage): return np.clip(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_min, fmap_max)
     assert architecture in ['orig', 'skip', 'resnet']
     act = nonlinearity
@@ -174,6 +187,8 @@ def G_synthesis_stylegan2(
         x = modulated_conv2d_layer(x, dlatents_in[:, layer_idx], fmaps=fmaps, kernel=kernel, up=up, resample_kernel=resample_kernel, fused_modconv=fused_modconv, impl=impl)
         if size is not None and up is True:
             x = fix_size(x, size, scale_type)
+            # multi latent blending
+            x = multimask(x, size, latmask, countH, countW, splitfine)
         if randomize_noise:
             noise = tf.random_normal([tf.shape(x)[0], 1, x.shape[2], x.shape[3]], dtype=x.dtype)
         else:
@@ -213,6 +228,8 @@ def G_synthesis_stylegan2(
         with tf.variable_scope('Const'):
             x = tf.get_variable('const', shape=[1, nf(1), *init_res], initializer=tf.initializers.random_normal())
             x = tf.tile(tf.cast(x, dtype), [tf.shape(dlatents_in)[0], 1, 1, 1])
+            # distortion technique from Aydao
+            x += dconst
         with tf.variable_scope('Conv'):
             x = layer(x, layer_idx=0, size=None, fmaps=nf(1), kernel=3)
         if architecture == 'skip':

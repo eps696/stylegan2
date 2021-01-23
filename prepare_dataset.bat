@@ -6,6 +6,6 @@ python src/training/dataset_tool.py --dataset data/%1 --jpg ^
 goto end
 
 :help
-echo Usage: make_dataset imagedir
+echo Usage: prepare_dataset imagedir
 
 :end

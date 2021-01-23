@@ -13,14 +13,14 @@ python src/_genSGAN2.py --model models/%~n1.pkl --out_dir _out/%~n1 --size 1-1 -
 %3 %4 %5 %6 %7 %8 %9
 
 :ff
-ffmpeg -y -v warning -r 25 -i _out\%~n1\%%05d.jpg -c:v mjpeg -q:v 2 _out/%~n1-%2.avi
-rem rmdir /s /q _out\%~n1
+ffmpeg -y -v warning -i _out\%~n1\%%06d.jpg -c:v mjpeg -q:v 2 _out/%~n1-%2.avi
+rmdir /s /q _out\%~n1
 
 goto end
 
 
 :help
 echo Usage: gen model x-y framecount-transit
-echo e.g.:  gen ffhq-1024-f 1280-720 100-25
+echo e.g.:  gen ffhq-1024 1280-720 100-25
 
 :end

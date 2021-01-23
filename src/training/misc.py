@@ -5,11 +5,9 @@
 
 import os
 import glob
-import re
 import pickle
 import numpy as np
 import PIL.Image
-import PIL.ImageFont
 import dnnlib
 
 # ----------------------------------------------------------------------------

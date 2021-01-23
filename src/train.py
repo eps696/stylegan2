@@ -3,31 +3,24 @@
 # https://nvlabs.github.io/stylegan2/license.html
 
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 import sys
 import argparse
 import copy
 import numpy as np
+import tensorflow as tf
 
 import dnnlib
+import dnnlib.tflib as tflib
 from dnnlib import EasyDict
-
+from training import dataset as _dataset
 from training.dataset_tool import create_from_images
-from util.utilgan import basename, file_list, calc_init_res
+
+from util.utilgan import basename, file_list
 
 def run(dataset, train_dir, config, d_aug, diffaug_policy, cond, ops, jpg_data, mirror, mirror_v, \
         lod_step_kimg, batch_size, resume, resume_kimg, finetune, num_gpus, ema_kimg, gamma, freezeD):
 
-    # dataset (tfrecords) - preprocess or get 
-    tfr_files = file_list(os.path.dirname(dataset), 'tfr')
-    tfr_files = [f for f in tfr_files if basename(dataset) in f]
-    if len(tfr_files) == 0 or os.stat(tfr_files[0]).st_size == 0:
-        tfr_file, total_samples = create_from_images(dataset, jpg=jpg_data)
-    else:
-        tfr_file = tfr_files[0]
-    dataset_args = EasyDict(tfrecord=tfr_file, jpg_data=jpg_data)
-    
-    desc = basename(tfr_file).split('-')[0]
-    
     # training functions
     if d_aug: # https://github.com/mit-han-lab/data-efficient-gans
         train = EasyDict(run_func_name='training.training_loop_diffaug.training_loop')          # Options for training loop (Diff Augment method)
@@ -48,23 +41,39 @@ def run(dataset, train_dir, config, d_aug, diffaug_policy, cond, ops, jpg_data, 
     tf_config = {'rnd.np_random_seed': 1000}                                   # Options for tflib.init_tf().
     G.impl    = D.impl = ops
 
+    # dataset (tfrecords) - get or create
+    tfr_files = file_list(os.path.dirname(dataset), 'tfr')
+    tfr_files = [f for f in tfr_files if basename(f).split('-')[0] == basename(dataset)]
+    if len(tfr_files) == 0 or os.stat(tfr_files[0]).st_size == 0:
+        tfr_file, total_samples = create_from_images(dataset, jpg=jpg_data)
+    else:
+        tfr_file = tfr_files[0]
+    dataset_args = EasyDict(tfrecord=tfr_file, jpg_data=jpg_data)
+    
     # resolutions
-    data_res = basename(tfr_file).split('-')[-1].split('x') # get resolution from dataset filename
-    data_res = list(reversed([int(x) for x in data_res])) # convert to int list
-    init_res, resolution, res_log2 = calc_init_res(data_res)
-    if init_res != [4,4]: 
+    with tf.Graph().as_default(), tflib.create_session().as_default(): # pylint: disable=not-context-manager
+        dataset_obj = _dataset.load_dataset(**dataset_args) # loading the data to see what comes out
+        resolution = dataset_obj.resolution
+        init_res = dataset_obj.init_res
+        res_log2 = dataset_obj.res_log2
+        dataset_obj.close()
+        dataset_obj = None
+    
+    if list(init_res) == [4,4]: 
+        desc = '%s-%d' % (basename(dataset), resolution)
+    else:
         print(' custom init resolution', init_res)
+        desc = basename(tfr_file)
     G.init_res = D.init_res = list(init_res)
     
-    train.setname = desc + config
-    desc = '%s-%d-%s' % (desc, resolution, config)
+    train.savenames = [desc.replace(basename(dataset), 'snapshot'), desc]
+    desc += '-%s' % config
     
     # training schedule
     sched.lod_training_kimg = lod_step_kimg 
     sched.lod_transition_kimg = lod_step_kimg 
-    train.total_kimg = lod_step_kimg * res_log2 * 2 # a la ProGAN
-    if finetune:
-        train.total_kimg = 15000 # should start from ~10k kimg
+    sched.tick_kimg_base = 2 # if finetune else 0.2
+    train.total_kimg = lod_step_kimg * res_log2 * 3 # 1.5 * ProGAN
     train.image_snapshot_ticks = 1
     train.network_snapshot_ticks = 5
     train.mirror_augment = mirror
@@ -74,13 +83,13 @@ def run(dataset, train_dir, config, d_aug, diffaug_policy, cond, ops, jpg_data, 
     if config == 'e':
         if finetune: # uptrain 1024
             sched.G_lrate_base = 0.001
+            sched.lrate_step = 150 # period for stepping to next lrate, in kimg
         else: # train 1024
             sched.G_lrate_base = 0.001
             sched.G_lrate_dict = {0:0.001, 1:0.0007, 2:0.0005, 3:0.0003}
             sched.lrate_step = 1500 # period for stepping to next lrate, in kimg
     if config == 'f':
-        # sched.G_lrate_base = 0.0003
-        sched.G_lrate_base = 0.001
+        sched.G_lrate_base = 0.001 # 0.0003 for few-shot datasets
     sched.D_lrate_base = sched.G_lrate_base # *2 - not used anyway
 
     sched.minibatch_gpu_base = batch_size

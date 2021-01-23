@@ -127,6 +127,67 @@ def latent_anima(shape, frames, transit, key_latents=None, smooth=0.5, cubic=Fal
     
 # = = = = = = = = = = = = = = = = = = = = = = = = = = = 
     
+def multimask(x, size, latmask=None, countH=1, countW=1, delta=0.):
+    if countH > 1 or countW > 1:
+        W = x.shape[3] # width
+        H = x.shape[2] # height
+        if countW > 1:
+            stripe_mask = []
+            for i in range(countW):
+                ch_mask = peak_roll(W, countW, i, delta)[tf.newaxis, tf.newaxis, :] # [1,1,w]
+                ch_mask = tf.tile(ch_mask, multiples=[1,H,1]) # [1,h,w]
+                stripe_mask.append(ch_mask)
+            maskW = tf.convert_to_tensor(stripe_mask) # [x,1,h,w]
+        else: maskW = [1]
+        if countH > 1:
+            stripe_mask = []
+            for i in range(countH):
+                ch_mask = peak_roll(H, countH, i, delta)[tf.newaxis, :, tf.newaxis] # [1,h,1]
+                ch_mask = tf.tile(ch_mask, multiples=[1,1,W]) # [1,h,w]
+                stripe_mask.append(ch_mask)
+            maskH = tf.convert_to_tensor(stripe_mask) # [y,1,h,w]
+        else: maskH = [1]
+        mask = []
+        for i in range(countW):
+            for j in range(countH):
+                mask.append(maskW[i] * maskH[j])
+        mask = tf.convert_to_tensor(mask, x.dtype) # [xy,1,h,w]
+        x = tf.reduce_sum(x[:countH*countW] * mask, 0)[tf.newaxis, :]
+    elif latmask.shape[1] > 1 or latmask.shape[2] > 1: # [b,h,w]
+        if len(latmask.shape) < 4:
+            latmask = latmask[:,:,:,tf.newaxis]
+        if latmask.shape[1:3] != size:
+            latmask = tf.image.resize(latmask, size, method='nearest')
+        latmask = tf.transpose(latmask, [0,3,1,2])
+        latmask = tf.cast(latmask, x.dtype)
+        x = tf.reduce_sum(x[:latmask.shape[0]] * latmask, 0, keepdims=True)
+    else:
+        pass
+    return x # [1,f,h,w]
+
+def peak_roll(width, count, num, delta):
+    step = width // count
+    if width > step*2:
+        fill_range = tf.zeros([width-step*2])
+        full_ax = tf.concat((peak(step, delta), fill_range), 0)
+    else:
+        full_ax = peak(step, delta)[:width]
+    if num == 0: 
+        shift = width - (step//2) # must be positive!
+    else:
+        shift = step*num - (step//2)
+    full_ax = tf.roll(full_ax, shift, 0)
+    return full_ax # [width,]
+
+def peak(steps, delta):
+    x = tf.linspace(0-delta, 1.+ delta, steps)
+    x_rev = tf.reverse(x,[0])
+    x = tf.concat((x, x_rev), 0)
+    x = tf.clip_by_value(x, 0., 1.)
+    return x # [steps*2,]
+
+# = = = = = = = = = = = = = = = = = = = = = = = = = = = 
+    
 def ups2d(x, factor=2):
     assert isinstance(factor, int) and factor >= 1
     if factor == 1: return x
@@ -140,28 +201,38 @@ def pad_up_to(x, size, type='centr'):
     sh = (x.shape[1].value, x.shape[2].value)
     padding = [[0,0]]
     for i, s in enumerate(size):
-        if type.lower() == 'centr':
+        if 'side' in type.lower():
+            padding.append([0, s-sh[i]])
+        else: # centr
             p0 = (s-sh[i]) // 2
             p1 = s-sh[i] - p0
             padding.append([p0, p1])
-        else:
-            padding.append([0, s-sh[i]])
     padding.append([0,0])
-    y = tf.pad(x, padding, 'symmetric') # REFLECT, SYMMETRIC
-    # print(' pad', sh, 'to', size, '\t == ', padding, y.shape)
+    y = tf.pad(x, padding, 'symmetric')
     return y
 
-def fix_size(x, size, scale_type='centr', order='BCHW'): # scale_type = one of [fit, centr, side]
+def fix_size(x, size, scale_type='centr', order='BCHW'): # scale_type = one of [pad, padside, centr, side, fit]
     if not len(x.get_shape()) == 4:
         raise Exception(" Wrong data rank, shape:", x.get_shape())
     if (x.get_shape()[2], x.get_shape()[3]) == size:
         return x
     if (x.get_shape()[2]*2, x.get_shape()[3]*2) == size:
-        return ups2d(x)
+        return ups2d(x) # BCHW only
     if order == 'BCHW': # BCHW for PGAN/SGANs, BHWC for old GANs
         x = tf.transpose(x, [0,2,3,1])
     if scale_type.lower() == 'fit':
         x = tf.image.resize_images(x, size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR, align_corners=True)
+    elif 'pad' in scale_type.lower():
+        sh0 = x.get_shape().as_list()[1:3]
+        try: size = [s.value for s in size]
+        except: pass
+        new_size = sh0[:2]
+        # workaround if pad > srcsize (not enough pixels to fill in)
+        for i in [0,1]:
+            while size[i] > 2*new_size[i]:
+                new_size[i] *= 2
+                x = pad_up_to(x, new_size, scale_type)
+        x = pad_up_to(x, size, scale_type)
     else: # proportional scale to smaller side, then pad to bigger side
         sh0 = x.get_shape().as_list()[1:3]
         try: size = [s.value for s in size]
@@ -184,8 +255,8 @@ def hw_scales(size, base, n, keep_first_layers=None, verbose=False):
     if isinstance(base, int): base = (base, base)
     start_res = [int(b * 2 ** (-n)) for b in base]
     
-    start_res[0] = start_res[0] * size[0] // base[0]
-    start_res[1] = start_res[1] * size[1] // base[1]
+    start_res[0] = int(start_res[0] * size[0] // base[0])
+    start_res[1] = int(start_res[1] * size[1] // base[1])
 
     hw_list = []
     
@@ -194,7 +265,7 @@ def hw_scales(size, base, n, keep_first_layers=None, verbose=False):
     if keep_first_layers is not None and keep_first_layers > 0:
         for i in range(keep_first_layers):
             hw_list.append(start_res)
-            start_res = [x * 2 for x in start_res]
+            start_res = [x*2 for x in start_res]
             n -= 1
             
     ch = (size[0] / start_res[0]) ** (1/n)
@@ -253,9 +324,12 @@ def dir_list(in_dir):
     dirs = [os.path.join(in_dir, x) for x in os.listdir(in_dir)]
     return sorted([f for f in dirs if os.path.isdir(f)])
 
-def img_list(path):
-    files = [os.path.join(path, file_i) for file_i in os.listdir(path)
-            if file_i.lower().endswith('.jpg') or file_i.lower().endswith('.jpeg') or file_i.lower().endswith('.png')]
+def img_list(path, subdir=None):
+    if subdir is True:
+        files = [os.path.join(dp, f) for dp, dn, fn in os.walk(path) for f in fn]
+    else:
+        files = [os.path.join(path, f) for f in os.listdir(path)]
+    files = [f for f in files if os.path.splitext(f.lower())[1][1:] in ['jpg', 'jpeg', 'png', 'ppm', 'tif']]
     return sorted([f for f in files if os.path.isfile(f)])
 
 def img_read(path):
