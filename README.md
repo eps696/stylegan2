@@ -18,6 +18,7 @@ Note about [StyleGAN2-ada]: Performed tests have shown yet smoother (not faster!
 Windows batch-commands for main tasks, such as ::
 * video rendering with slerp/cubic/gauss trajectory smoothing (requires [FFMPEG])
 * animated "playback" of saved latent snapshots, direction vectors, etc.
+* easy models surgery
 
 also, from [Data-Efficient GANs] ::
 * differential augmentation for fast training on small datasets (~100 images)
