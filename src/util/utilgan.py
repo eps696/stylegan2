@@ -22,11 +22,15 @@ import tensorflow; tf = tensorflow.compat.v1 if hasattr(tensorflow.compat,'v1') 
 
 def load_latents(npy_file):
     key_latents = np.load(npy_file)
+    try:
+        key_latents = key_latents[key_latents.files[0]]
+    except:
+        pass
     idx_file = os.path.splitext(npy_file)[0] + '.txt'
     if os.path.exists(idx_file): 
         with open(idx_file) as f:
-            lat_idx = f.read()
-            lat_idx = [int(l) for l in lat_idx.split(',')]
+            lat_idx = f.readline()
+            lat_idx = [int(l.strip()) for l in lat_idx.split(',') if '\n' not in l and len(l.strip())>0]
         key_latents = [key_latents[i] for i in lat_idx]
     return np.asarray(key_latents)
 
