@@ -25,7 +25,7 @@ also, from [Data-Efficient GANs] ::
 * support of custom CUDA-compiled TF ops and (slower) Python-based reference ops
 
 also, from [Aydao] ::
-* "digression" technique (funky image displacements)
+* funky "digression" technique (added inside the network for ~6x speed-up)
 * cropping square models to non-square aspect ratio (experimental)
 
 also, from [Peter Baylies] and [skyflynil] ::
