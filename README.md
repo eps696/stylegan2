@@ -147,7 +147,17 @@ This will produce working non-square 1024x768 model. Opposite to the method abov
 ```
 This would work properly only for models from one "family", i.e. uptrained (finetuned) from the same original model. 
 
+## Credits
 
+StyleGAN2: 
+Copyright © 2019, NVIDIA Corporation. All rights reserved.
+Made available under the [Nvidia Source Code License-NC]
+Original paper: http://arxiv.org/abs/1912.04958
+
+Other contributions:
+follow the links in the descriptions.
+
+[Nvidia Source Code License-NC]: <https://nvlabs.github.io/stylegan2/license.html>
 [StyleGAN2]: <https://github.com/NVlabs/stylegan2>
 [StyleGAN2-ada]: <https://github.com/NVlabs/stylegan2-ada>
 [Peter Baylies]: <https://github.com/pbaylies/stylegan2>
