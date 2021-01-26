@@ -92,7 +92,7 @@ Instead of simple frame splitting, one can load external mask(s) from b/w image 
 ```
  gen.bat ffhq-1024 3072-1024 500-20 --latmask <path>
 ```
-Arguments `--digress X` would add some animated funky displacements with X strength. Arguments `--trunc X` controls truncation psi parameter, as usual. 
+Arguments `--digress X` would add some animated funky displacements with X strength (by tweaking initial const layer params). Arguments `--trunc X` controls truncation psi parameter, as usual. 
 
 **NB**: Windows batch-files support only 9 command arguments; if you need more options, you have to edit batch-file itself.
 
