@@ -18,6 +18,7 @@ parser.add_argument('--source', required=True, help='Source model path')
 parser.add_argument('--out_dir', default='./', help='Output directory for reduced/reconstructed model')
 parser.add_argument('--reconstruct', '-r', action='store_true', help='Reconstruct model (add internal arguments)')
 parser.add_argument('--res', '-s', default=None, help='Target resolution in format X-Y')
+parser.add_argument('--verbose', '-v', action='store_true')
 a = parser.parse_args()
 
 if a.res is not None: 
@@ -38,19 +39,23 @@ def save_pkl(networks, filepath):
     with open(filepath, 'wb') as file:
         pickle.dump(networks, file, protocol=pickle.HIGHEST_PROTOCOL)
 
-def create_model(data_shape, full=False):
+def create_model(data_shape, full=False, kwargs_in=None):
     init_res, resolution, res_log2 = calc_init_res(data_shape[1:])
-    Gs_kwargs = dnnlib.EasyDict()
-    Gs_kwargs.resolution = resolution
-    Gs_kwargs.init_res = init_res
-    Gs_kwargs.num_channels = data_shape[0]
-    Gs_kwargs.label_size = 0
+    kwargs_out = dnnlib.EasyDict()
+    kwargs_out.num_channels = data_shape[0]
+    kwargs_out.label_size = 0
+    if kwargs_in is not None:
+        for k in list(kwargs_in.keys()):
+            kwargs_out[k] = kwargs_in[k]
+    kwargs_out.resolution = resolution
+    kwargs_out.init_res = init_res
+    if a.verbose is True: print(['%s: %s'%(kv[0],kv[1]) for kv in sorted(kwargs_out.items())])
     if full is True:
-        G = tflib.Network('G', func_name='training.networks_stylegan2.G_main', **Gs_kwargs)
-        D = tflib.Network('D', func_name='training.networks_stylegan2.D_stylegan2', **Gs_kwargs)
+        G = tflib.Network('G', func_name='training.networks_stylegan2.G_main', **kwargs_out)
+        D = tflib.Network('D', func_name='training.networks_stylegan2.D_stylegan2', **kwargs_out)
         Gs = G.clone('Gs')
     else:
-        Gs = tflib.Network('Gs', func_name='training.networks_stylegan2.G_main', **Gs_kwargs)
+        Gs = tflib.Network('Gs', func_name='training.networks_stylegan2.G_main', **kwargs_out)
         G = D = None
     return G, D, Gs, res_log2
 
@@ -151,7 +156,7 @@ def main():
     if a.res is not None:
         print(' Reconstructing model with size', a.res)
         data_shape = [Gs_in.output_shape[1], *a.res]
-        G_out, D_out, Gs_out, res_out_log2 = create_model(data_shape, True)
+        G_out, D_out, Gs_out, res_out_log2 = create_model(data_shape, True, Gs_in.static_kwargs)
 
         if a.res[0] == a.res[1]:
             assert G_in is not None and D_in is not None, " !! G/D subnets not found in source model !!"
@@ -173,7 +178,7 @@ def main():
     elif a.reconstruct is True:
         print(' Reconstructing model with same size')
         data_shape = Gs_in.output_shape[1:]
-        _, _, Gs_out, _ = create_model(data_shape, False)
+        _, _, Gs_out, _ = create_model(data_shape, False, Gs_in.static_kwargs)
         Gs_out.copy_vars_from(Gs_in)
 
     else:

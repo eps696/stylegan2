@@ -127,6 +127,7 @@ The resulting file is saved with `-Gs` suffix. It's recommended to add `-r` opti
  model_convert.bat snapshot-256.pkl --res 512
 ```
 This will produce new model with 512px resolution, populating weights on the layers up to 256px from the source snapshot (the rest will be initialized randomly). It also can decrease resolution (say, make 512 from 1024). Note that this effectively changes the number of layers in the model. 
+
 This option works with complete (G/D/Gs) models only, since it's purposed for transfer-learning (the resulting model will contain either partially random weights, or wrong `ToRGB` params). 
 
 * Crop resolution of a trained model:
