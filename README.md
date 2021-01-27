@@ -81,7 +81,7 @@ There's no need to go for exact steps in this case, you may stop when you're ok 
 ```
  gen.bat ffhq-1024 1280-720 500-20
 ```
-This will load `ffhq-1024.pkl` from `model` directory and make a 1280x720 px video of 500 frames, with interpolation step of 20 frames between keypoints. Please note: omitting `.pkl` extension would load custom network, effectively enabling arbitrary resolution, multi-latent blending, etc. Using filename with extension will load the network from PKL "as is" (useful to test foreign downloaded models). There are `--cubic` and `--gauss` options for animation smoothing, and few `--scale_type` choices. Add `--save_lat` option to save all traversed dlatent points as Numpy array in `*.npy` file (useful for further curating).
+This will load `ffhq-1024.pkl` from `models` directory and make a 1280x720 px video of 500 frames, with interpolation step of 20 frames between keypoints. Please note: omitting `.pkl` extension would load custom network, effectively enabling arbitrary resolution, multi-latent blending, etc. Using filename with extension will load the network from PKL "as is" (useful to test foreign downloaded models). There are `--cubic` and `--gauss` options for animation smoothing, and few `--scale_type` choices. Add `--save_lat` option to save all traversed dlatent points as Numpy array in `*.npy` file (useful for further curating).
 
 * Generate more various imagery:
 ```
