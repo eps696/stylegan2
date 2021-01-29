@@ -20,7 +20,7 @@ Note about [StyleGAN2-ada]: Performed tests have shown yet smoother (not faster!
 Various running methods ::
 * Windows batch-commands (preferred, if you're on Windows)
 * local Jupyter notebook (with brief examples for beginners)
-* [Colab notebook]
+* [Colab notebook]  
 NB: video output requires [FFMPEG] 
 
 also, from [Data-Efficient GANs] ::
