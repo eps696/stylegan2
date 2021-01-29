@@ -9,9 +9,12 @@ from dnnlib import EasyDict
 import dnnlib.tflib as tflib
 from dnnlib.tflib import tfutil
 
-from eps.utilgan import calc_init_res
-from eps.progress_bar import ProgressBar
-from eps.data_load import basename
+from util.utilgan import basename, calc_init_res
+try: # progress bar for notebooks 
+    get_ipython().__class__.__name__
+    from util.progress_bar import ProgressIPy as ProgressBar
+except: # normal console
+    from util.progress_bar import ProgressBar
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--source', required=True, help='Source model path')

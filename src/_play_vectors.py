@@ -10,7 +10,11 @@ import dnnlib
 import dnnlib.tflib as tflib
 
 from util.utilgan import load_latents, file_list, basename
-from util.progress_bar import ProgressBar
+try: # progress bar for notebooks 
+    get_ipython().__class__.__name__
+    from util.progress_bar import ProgressIPy as ProgressBar
+except: # normal console
+    from util.progress_bar import ProgressBar
 
 desc = "Customized StyleGAN2 on Tensorflow"
 parser = argparse.ArgumentParser(description=desc)
@@ -65,26 +69,26 @@ def get_coeffs_dir(lrange, count):
     
 def make_loop(base_latent, direction, lrange, fcount, start_frame=0):
     coeffs = get_coeffs_dir(lrange, fcount//2)
-    pbar = ProgressBar(fcount)
+    # pbar = ProgressBar(fcount)
     for i in range(fcount):
         img = render_latent_dir(base_latent, direction, coeffs[i])
         fname1 = os.path.join(a.out_dir, 'ttt', "%06d.jpg" % (i+start_frame))
-        if i%2==0:
+        if i%2==0 and a.verbose is True:
             cv2.imshow('latent', img[:,:,::-1])
             cv2.waitKey(10)
         imsave(fname1, img)
-        pbar.upd()
+        # pbar.upd()
 
 def make_transit(lat1, lat2, fcount, start_frame=0):
-    pbar = ProgressBar(fcount)
+    # pbar = ProgressBar(fcount)
     for i in range(fcount):
         img = render_latent_mix(lat1, lat2, i/fcount)
         fname = os.path.join(a.out_dir, 'ttt', "%06d.jpg" % (i+start_frame))
-        if i%2==0:
+        if i%2==0 and a.verbose is True:
             cv2.imshow('latent', img[:,:,::-1])
             cv2.waitKey(10)
         imsave(fname, img)
-        pbar.upd()
+        # pbar.upd()
         
 def main():
     if a.vector_dir is not None:
@@ -150,8 +154,10 @@ def main():
         if use_d:
             base_latent = Gs.components.mapping.run(base_latent, None) # [frm,18,512]
 
+    pbar = ProgressBar(len(directions))
     for i, direction in enumerate(directions):
         make_loop(base_latent, direction, lrange, a.fstep*2, a.fstep*2 * i)
+        pbar.upd()
         
         # make_transit(base_lats[i], base_lats[(i+1)%len(base_lats)], n, 2*n*i + n)
 

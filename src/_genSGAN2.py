@@ -8,8 +8,12 @@ import pickle
 import dnnlib
 import dnnlib.tflib as tflib
 
-from util.utilgan import latent_anima, basename
-from util.progress_bar import ProgressBar
+from util.utilgan import latent_anima, basename, img_read
+try: # progress bar for notebooks 
+    get_ipython().__class__.__name__
+    from util.progress_bar import ProgressIPy as ProgressBar
+except: # normal console
+    from util.progress_bar import ProgressBar
 
 desc = "Customized StyleGAN2 on Tensorflow"
 parser = argparse.ArgumentParser(description=desc)
@@ -60,9 +64,9 @@ def main():
         if a.verbose is True: print(' Latent blending with mask', a.latmask)
         n_mult = 2
         if os.path.isfile(a.latmask): # single file
-            lmask = np.asarray([[imread(a.latmask)[:,:,0] / 255.]]) # [h,w]
+            lmask = np.asarray([[img_read(a.latmask)[:,:,0] / 255.]]) # [h,w]
         elif os.path.isdir(a.latmask): # directory with frame sequence
-            lmask = np.asarray([[imread(f)[:,:,0] / 255. for f in img_list(a.latmask)]]) # [h,w]
+            lmask = np.asarray([[img_read(f)[:,:,0] / 255. for f in img_list(a.latmask)]]) # [h,w]
         else:
             print(' !! Blending mask not found:', a.latmask); exit(1)
         lmask = np.concatenate((lmask, 1 - lmask), 1) # [frm,2,h,w]

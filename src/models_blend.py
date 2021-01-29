@@ -18,7 +18,7 @@ import dnnlib
 import dnnlib.tflib as tflib
 from dnnlib.tflib import tfutil
 
-from eps.data_load import basename
+from util.utilgan import basename
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--out_dir', default='_out', help='Output directory')

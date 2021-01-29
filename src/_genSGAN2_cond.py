@@ -10,7 +10,11 @@ import dnnlib
 import dnnlib.tflib as tflib
 
 from util.utilgan import latent_anima, basename
-from util.progress_bar import ProgressBar
+try: # progress bar for notebooks 
+    get_ipython().__class__.__name__
+    from util.progress_bar import ProgressIPy as ProgressBar
+except: # normal console
+    from util.progress_bar import ProgressBar
 
 desc = "Customized StyleGAN2 on Tensorflow"
 parser = argparse.ArgumentParser(description=desc)

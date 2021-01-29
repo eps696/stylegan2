@@ -18,8 +18,12 @@ import pickle
 import projector
 from training import misc
 
-from util.progress_bar import ProgressBar
 from util.utilgan import img_list, img_read, basename
+try: # progress bar for notebooks 
+    get_ipython().__class__.__name__
+    from util.progress_bar import ProgressIPy as ProgressBar
+except: # normal console
+    from util.progress_bar import ProgressBar
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument('--model', help='Network pickle filename', required=True)

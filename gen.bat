@@ -9,7 +9,7 @@ python src/_genSGAN2.py --model models/%1 --out_dir _out/%~n1 --size %2 --frames
 goto ff
 
 :test
-python src/_genSGAN2.py --model models/%~n1.pkl --out_dir _out/%~n1 --size 1-1 --frames 200-20 ^
+python src/_genSGAN2.py --model models/%~n1.pkl --out_dir _out/%~n1 --frames 200-20 ^
 %3 %4 %5 %6 %7 %8 %9
 
 :ff

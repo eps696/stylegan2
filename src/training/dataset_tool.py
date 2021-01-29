@@ -17,7 +17,11 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__))) # upper dir
 
 import dnnlib
 
-from util.progress_bar import ProgressBar
+try: # progress bar for notebooks 
+    get_ipython().__class__.__name__
+    from util.progress_bar import ProgressIPy as ProgressBar
+except: # normal console
+    from util.progress_bar import ProgressBar
 
 class TFRecordExporter:
     def __init__(self, data_dir, expected_images, print_progress=False, progress_interval=10):

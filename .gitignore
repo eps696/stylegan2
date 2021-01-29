@@ -3,5 +3,6 @@ __pycache__/
 _cudacache/
 
 # Jupyter Notebook
-.ipynb_checkpoints
+.ipynb_checkpoints/
 
+*.pkl

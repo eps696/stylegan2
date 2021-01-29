@@ -8,7 +8,11 @@ import argparse
 import numpy as np
 import cv2
 
-from progress_bar import ProgressBar
+try: # progress bar for notebooks 
+    get_ipython().__class__.__name__
+    from progress_bar import ProgressIPy as ProgressBar
+except: # normal console
+    from progress_bar import ProgressBar
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--in_dir', help='Input directory')
@@ -67,12 +71,7 @@ def main():
     # CV_IMWRITE_PNG_COMPRESSION from 0 to 9. A higher value means a smaller size and longer
     # compression time. If read raw images during training, use 0 for faster IO speed.
 
-    if not os.path.exists(save_folder):
-        os.makedirs(save_folder)
-        print('mkdir [{:s}] ...'.format(save_folder))
-    else:
-        print('Folder [{:s}] already exists. Exit...'.format(save_folder))
-        sys.exit(1)
+    os.makedirs(save_folder, exist_ok=True)
 
     img_list = []
     for root, _, file_list in sorted(os.walk(input_folder)):
@@ -95,4 +94,7 @@ def main():
 
 
 if __name__ == '__main__':
+    # workaround for multithreading in jupyter console
+    __spec__ = "ModuleSpec(name='builtins', loader=<class '_frozen_importlib.BuiltinImporter'>)"
     main()
+

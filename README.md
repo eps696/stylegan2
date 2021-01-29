@@ -64,9 +64,9 @@ The length of the training is defined by `--lod_step_kimg XX` argument. It's kin
  train_resume.bat mydata 000-mydata-512-f
 ```
 
-* Uptrain (finetune) trained model on new data:
+* Uptrain (finetune) trained model `ffhq-512.pkl` on new data:
 ```
- train_resume.bat newdata 000-mydata-512-f --finetune
+ train_resume.bat newdata ffhq-512.pkl --finetune
 ```
 There's no need to go for exact steps in this case, you may stop when you're ok with the results (it's better to set low `lod_step_kimg` to follow the progress). Again, `--d_aug` would greatly enhance training here. There's also `--freezeD` option, supposedly enhancing finetuning on similar data.
 
@@ -132,13 +132,13 @@ This option works with complete (G/D/Gs) models only, since it's purposed for tr
 
 * Crop resolution of a trained model:
 ```
- model_convert.bat snapshot-1024-xxx.pkl --res 1024-768
+ model_convert.bat snapshot-1024.pkl --res 1024-768
 ```
 This will produce working non-square 1024x768 model. Opposite to the method above, this one doesn't change layer count. This is experimental feature (as stated by the author @Aydao), also using some voluntary logic, so works only with basic resolutions.
 
 * Combine lower layers from one model with higher layers from another:
 ```
- models_blend.bat model1.pkl model1.pkl <res> <level>
+ models_blend.bat model1.pkl model2.pkl <res> <level>
 ```
 `<res>` is resolution, at which the models are switched (usually 32/64/128); `<level>` is 0 or 1.
 
