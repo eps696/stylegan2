@@ -2,7 +2,7 @@
 
 <p align='center'><img src='_out/palekh-512-1536x512-3x1.jpg' /></p>
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eps696/stylegan2/blob/colab/StyleGAN2-colab.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eps696/stylegan2/blob/colab/StyleGAN2_colab.ipynb)
 
 This version of famous [StyleGAN2] is intended mostly for fellow artists, who rarely look at scientific metrics, but rather need a working creative tool. At least, this is what I use daily myself. 
 Tested on Tensorflow 1.14, requires `pyturbojpeg` for JPG support. For more explicit details refer to the original implementations. 
@@ -173,4 +173,4 @@ follow the links in the descriptions.
 [Freeze the Discriminator]: <https://arxiv.org/abs/2002.10964>
 [FFMPEG]: <https://ffmpeg.org/download.html>
 [progressive GAN]: <https://github.com/tkarras/progressive_growing_of_gans>
-[Colab notebook]: <https://colab.research.google.com/github/eps696/stylegan2/blob/colab/StyleGAN2-colab.ipynb>
+[Colab notebook]: <https://colab.research.google.com/github/eps696/stylegan2/blob/colab/StyleGAN2_colab.ipynb>

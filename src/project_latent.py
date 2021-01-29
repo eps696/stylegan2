@@ -29,7 +29,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpForm
 parser.add_argument('--model', help='Network pickle filename', required=True)
 parser.add_argument('--in_dir', help='Dataset root directory', required=True)
 parser.add_argument('--out_dir', help='Root directory for run results (default: %(default)s)', default='_out', metavar='DIR')
-parser.add_argument('--steps', type=int, default=2000, help='Number of iterations (default: %(default)s)') # 1000
+parser.add_argument('--steps', type=int, default=1000, help='Number of iterations (default: %(default)s)') # 1000
 parser.add_argument('--num_snapshots', type=int, default=10, help='Number of snapshots (default: %(default)s)')
 a = parser.parse_args()
 
