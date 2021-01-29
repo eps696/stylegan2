@@ -5,7 +5,7 @@
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eps696/stylegan2/blob/colab/StyleGAN2_colab.ipynb)
 
 This version of famous [StyleGAN2] is intended mostly for fellow artists, who rarely look at scientific metrics, but rather need a working creative tool. At least, this is what I use daily myself. 
-Tested on Tensorflow 1.14, requires `pyturbojpeg` for JPG support. For more explicit details refer to the original implementations. 
+Tested on Tensorflow 1.14, requires `pyturbojpeg` for JPG support. Sequence-to-video conversions require [FFMPEG]. For more explicit details refer to the original implementations. 
 
 Note about [StyleGAN2-ada]: Performed tests have shown yet smoother (not faster!) convergence, but lower output variety. Moreover, ada-version has failed on few-shot datasets (50~100 images); so meanwhile i personally stick to this repo with Diff Augmentation.
 
@@ -21,7 +21,6 @@ Various running methods ::
 * Windows batch-commands (preferred, if you're on Windows)
 * local Jupyter notebook (with brief examples for beginners)
 * [Colab notebook]  
-NB: video output requires [FFMPEG] 
 
 also, from [Data-Efficient GANs] ::
 * differential augmentation for fast training on small datasets (~100 images)
