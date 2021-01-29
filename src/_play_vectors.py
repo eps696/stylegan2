@@ -20,7 +20,7 @@ desc = "Customized StyleGAN2 on Tensorflow"
 parser = argparse.ArgumentParser(description=desc)
 parser.add_argument('--vector_dir', default=None, help='Saved latent directions in *.npy format')
 parser.add_argument('--npy_file', default=None, help='Saved latent vector as *.npy file')
-parser.add_argument('--out_dir', default='_out', help='Output directory')
+parser.add_argument('--out_dir', default='_out/ttt', help='Output directory')
 parser.add_argument('--model', default='models/ffhq-1024.pkl', help='path to checkpoint file')
 parser.add_argument('--size', default=None, help='output resolution, set in X-Y format')
 parser.add_argument('--scale_type', choices = ['pad','padside','centr','side','fit'], default='centr', help="pad (from center or topleft); centr/side = first scale then pad")
@@ -72,7 +72,7 @@ def make_loop(base_latent, direction, lrange, fcount, start_frame=0):
     # pbar = ProgressBar(fcount)
     for i in range(fcount):
         img = render_latent_dir(base_latent, direction, coeffs[i])
-        fname1 = os.path.join(a.out_dir, 'ttt', "%06d.jpg" % (i+start_frame))
+        fname1 = os.path.join(a.out_dir, "%06d.jpg" % (i+start_frame))
         if i%2==0 and a.verbose is True:
             cv2.imshow('latent', img[:,:,::-1])
             cv2.waitKey(10)
@@ -83,7 +83,7 @@ def make_transit(lat1, lat2, fcount, start_frame=0):
     # pbar = ProgressBar(fcount)
     for i in range(fcount):
         img = render_latent_mix(lat1, lat2, i/fcount)
-        fname = os.path.join(a.out_dir, 'ttt', "%06d.jpg" % (i+start_frame))
+        fname = os.path.join(a.out_dir, "%06d.jpg" % (i+start_frame))
         if i%2==0 and a.verbose is True:
             cv2.imshow('latent', img[:,:,::-1])
             cv2.waitKey(10)
@@ -93,7 +93,7 @@ def make_transit(lat1, lat2, fcount, start_frame=0):
 def main():
     if a.vector_dir is not None:
         if a.vector_dir.endswith('/') or a.vector_dir.endswith('\\'): a.vector_dir = a.vector_dir[:-1]
-    os.makedirs(osp.join(a.out_dir, 'ttt'), exist_ok=True)
+    os.makedirs(a.out_dir, exist_ok=True)
         
     global Gs, use_d
         
