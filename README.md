@@ -17,10 +17,11 @@ Note about [StyleGAN2-ada]: Performed tests have shown yet smoother (not faster!
 * models mixing (SWA) and layers-blending (from [Justin Pinkney])
 * freezing lower D layers for better finetuning (from [Freeze the Discriminator])
 
-Windows batch-commands for main tasks, such as ::
-* video rendering with slerp/cubic/gauss trajectory smoothing (requires [FFMPEG])
-* animated "playback" of saved latent snapshots, direction vectors
-* easy models surgery, etc.
+Various running methods ::
+* Windows batch-commands (preferred, if you're on Windows)
+* local Jupyter notebook (with brief examples for beginners)
+* [Colab notebook]
+NB: video output requires [FFMPEG] 
 
 also, from [Data-Efficient GANs] ::
 * differential augmentation for fast training on small datasets (~100 images)
@@ -172,3 +173,4 @@ follow the links in the descriptions.
 [Freeze the Discriminator]: <https://arxiv.org/abs/2002.10964>
 [FFMPEG]: <https://ffmpeg.org/download.html>
 [progressive GAN]: <https://github.com/tkarras/progressive_growing_of_gans>
+[Colab notebook]: <https://colab.research.google.com/github/eps696/stylegan2/blob/colab/StyleGAN2-colab.ipynb>
