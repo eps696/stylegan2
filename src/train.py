@@ -18,7 +18,7 @@ from training.dataset_tool import create_from_images
 
 from util.utilgan import basename, file_list
 
-def run(dataset, train_dir, config, d_aug, diffaug_policy, cond, ops, jpg_data, mirror, mirror_v, \
+def run(dataset, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mirror_v, \
         lod_step_kimg, batch_size, resume, resume_kimg, finetune, num_gpus, ema_kimg, gamma, freezeD):
 
     # training functions
@@ -43,12 +43,12 @@ def run(dataset, train_dir, config, d_aug, diffaug_policy, cond, ops, jpg_data, 
 
     # dataset (tfrecords) - get or create
     tfr_files = file_list(os.path.dirname(dataset), 'tfr')
-    tfr_files = [f for f in tfr_files if basename(f).split('-')[0] == basename(dataset)]
+    tfr_files = [f for f in tfr_files if basename(dataset) in basename(f).split('-')]
     if len(tfr_files) == 0 or os.stat(tfr_files[0]).st_size == 0:
-        tfr_file, total_samples = create_from_images(dataset, jpg=jpg_data)
+        tfr_file, total_samples = create_from_images(dataset)
     else:
         tfr_file = tfr_files[0]
-    dataset_args = EasyDict(tfrecord=tfr_file, jpg_data=jpg_data)
+    dataset_args = EasyDict(tfrecord=tfr_file)
     
     # resolutions
     with tf.Graph().as_default(), tflib.create_session().as_default(): # pylint: disable=not-context-manager
@@ -134,20 +134,19 @@ def run(dataset, train_dir, config, d_aug, diffaug_policy, cond, ops, jpg_data, 
 
 
 def main():
-    parser = argparse.ArgumentParser(description='StyleGAN2 with tweaks', formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description='StyleGAN2 for practice', formatter_class=argparse.RawDescriptionHelpFormatter)
     # main
     parser.add_argument('--dataset', required=True, help='Training dataset path', metavar='DIR')
     parser.add_argument('--train_dir', default='train', help='Root directory for training results (default: %(default)s)', metavar='DIR')
     parser.add_argument('--resume', default=None, help='Resume checkpoint path. None = from scratch')
-    parser.add_argument('--resume_kimg', default=0, type=int, help='Resume training from (in thousands of images)', metavar='N')
-    parser.add_argument('--lod_step_kimg', default=20, type=int, help='Thousands of images per LOD/layer step (default: %(default)s)', metavar='N')
+    parser.add_argument('--resume_kimg', type=int, default=0, help='Resume training from (in thousands of images)', metavar='N')
+    parser.add_argument('--lod_step_kimg', type=int, default=30, help='Thousands of images per LOD/layer step (default: %(default)s)', metavar='N')
     parser.add_argument('--finetune', action='store_true', help='finetune trained model (start from 1e4 kimg, stop when enough)')
     # network
     parser.add_argument('--config', default='F', help='Training config E (shrink) or F (large) (default: %(default)s)', metavar='CONFIG')
     parser.add_argument('--ops', default='cuda', help='Custom op implementation (cuda or ref, default: %(default)s)')
     parser.add_argument('--gamma', default=None, type=float, help='R1 regularization weight')
     # special
-    parser.add_argument('--jpg_data', action='store_true', help='Dataset tfrecords in raw JPG?')
     parser.add_argument('--d_aug', action='store_true', help='Use Diff Augment training for small datasets')
     parser.add_argument('--diffaug_policy', default='color,translation,cutout', help='Comma-separated list of DiffAugment policies (default: %(default)s)', metavar='..')
     parser.add_argument('--ema_kimg', default=None, type=int, help='Half-life of exponential moving average (for Diff Augment)', metavar='N')

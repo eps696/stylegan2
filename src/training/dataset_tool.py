@@ -91,7 +91,8 @@ class TFRecordExporter:
             quant = np.rint(img).clip(0, 255).astype(np.uint8)
             ex = tf.train.Example(features=tf.train.Features(feature={
                 'shape': tf.train.Feature(int64_list=tf.train.Int64List(value = quant.shape)),
-                'data': tf.train.Feature(bytes_list=tf.train.BytesList(value = [quant.tostring()]))}))
+                # 'data': tf.train.Feature(bytes_list=tf.train.BytesList(value = [quant.tostring()]))}))
+                'data': tf.train.Feature(bytes_list=tf.train.BytesList(value = [quant.tobytes()]))}))
             self.tfr_writer.write(ex.SerializeToString())
 
         self.cur_images += 1
@@ -109,14 +110,17 @@ class TFRecordExporter:
     def __exit__(self, *args):
         self.close()
 
-def img_list(path):
-    files = [os.path.join(path, f) for f in os.listdir(path)]
+def img_list(path, subdir=None):
+    if subdir is True:
+        files = [os.path.join(dp, f) for dp, dn, fn in os.walk(path) for f in fn]
+    else:
+        files = [os.path.join(path, f) for f in os.listdir(path)]
     files = [f for f in files if os.path.splitext(f.lower())[1][1:] in ['jpg', 'jpeg', 'png', 'ppm', 'tif']]
     return sorted([f for f in files if os.path.isfile(f)])
 
-def create_from_images(datadir, jpg=False, shuffle=True, size=None):
+def create_from_images(datadir, shuffle=True, size=None):
     assert os.path.isdir(datadir)
-    imgs = sorted(img_list(datadir))
+    imgs = sorted(img_list(datadir, subdir=True))
     assert len(imgs) > 0, ' No input images found!'
 
     sample_img = np.asarray(PIL.Image.open(imgs[0]))
@@ -124,6 +128,7 @@ def create_from_images(datadir, jpg=False, shuffle=True, size=None):
     channels = sample_shape[2] if sample_img.ndim == 3 else 1
     assert channels in [1,3,4], ' Weird color dim: %d' % channels
     print(' Making dataset ..', datadir, sample_shape)
+    jpg = channels < 4
     if jpg is True: print(' Loading JPG as is!')
 
     with TFRecordExporter(datadir, len(imgs)) as tfr:
@@ -135,7 +140,7 @@ def create_from_images(datadir, jpg=False, shuffle=True, size=None):
             pbar.upd()
     return tfr.tfr_file, len(imgs)
 
-def create_from_image_folders(datadir, jpg=False, shuffle=True, size=None):
+def create_from_image_folders(datadir, shuffle=True, size=None):
     assert os.path.isdir(datadir)
     imgs = []
     labels = []
@@ -154,6 +159,7 @@ def create_from_image_folders(datadir, jpg=False, shuffle=True, size=None):
     channels = sample_shape[2] if sample_img.ndim == 3 else 1
     assert channels in [1,3,4], ' Weird color dim: %d' % channels
     print(' Making dataset ..', datadir, sample_shape, '%d labels' % (np.max(labels)+1))
+    jpg = channels < 4
     if jpg is True: print(' Loading JPG as is!')
 
     with TFRecordExporter(datadir, len(imgs)) as tfr:
@@ -170,14 +176,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', required=True, help='Directory containing the images')
     parser.add_argument('--shuffle', type=bool, default=True, help='Randomize image order (default: 1)')
-    parser.add_argument('--jpg', action='store_true', help='save as jpg directly from file')
     parser.add_argument('--labels', action='store_true', help='use folders to generate labels')
     args = parser.parse_args()
 
     if args.labels is True:
-        create_from_image_folders(args.dataset, args.jpg, args.shuffle)
+        create_from_image_folders(args.dataset, args.shuffle)
     else:
-        create_from_images(args.dataset, args.jpg, args.shuffle)
+        create_from_images(args.dataset, args.shuffle)
 
 if __name__ == "__main__":
     main()

@@ -8,6 +8,7 @@ import argparse
 import numpy as np
 import cv2
 
+from utilgan import img_list, basename
 try: # progress bar for notebooks 
     get_ipython().__class__.__name__
     from progress_bar import ProgressIPy as ProgressBar
@@ -25,7 +26,7 @@ a = parser.parse_args()
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def worker(path, save_folder, crop_size, step, min_step, compression_level):
-    img_name = os.path.basename(path)
+    img_name = basename(path)
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
 
     # convert monochrome to RGB if needed
@@ -34,6 +35,8 @@ def worker(path, save_folder, crop_size, step, min_step, compression_level):
     if img.shape[2] == 1:
         img = img[:, :, (0,0,0)]
     h, w, c = img.shape
+    
+    ext = 'png' if img.shape[2]==4 else 'jpg'
 
     min_size = min(h,w)
     if min_size < crop_size:
@@ -54,9 +57,7 @@ def worker(path, save_folder, crop_size, step, min_step, compression_level):
             index += 1
             crop_img = img[x:x + crop_size, y:y + crop_size, :]
             crop_img = np.ascontiguousarray(crop_img)
-            cv2.imwrite(
-                os.path.join(save_folder, img_name[:-4] + '-s{:03d}.jpg'.format(index)),
-                crop_img, [cv2.IMWRITE_PNG_COMPRESSION, compression_level])
+            cv2.imwrite(os.path.join(save_folder, '%s-s%03d.%s' % (img_name, index, ext)), crop_img, [cv2.IMWRITE_PNG_COMPRESSION, compression_level])
     return 'Processing {:s} ...'.format(img_name)
 
 def main():
@@ -73,18 +74,15 @@ def main():
 
     os.makedirs(save_folder, exist_ok=True)
 
-    img_list = []
-    for root, _, file_list in sorted(os.walk(input_folder)):
-        path = [os.path.join(root, x) for x in file_list]  # assume only images in the input_folder
-        img_list.extend(path)
+    images = img_list(input_folder, subdir=True)
 
     def update(arg):
         pbar.upd(arg)
 
-    pbar = ProgressBar(len(img_list))
+    pbar = ProgressBar(len(images))
 
     pool = Pool(n_thread)
-    for path in img_list:
+    for path in images:
         pool.apply_async(worker,
             args=(path, save_folder, crop_size, step, min_step, compression_level),
             callback=update)

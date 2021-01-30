@@ -12,8 +12,8 @@ Note about [StyleGAN2-ada]: Performed tests have shown yet smoother (not faster!
 ## Features
 * inference (image generation) in arbitrary resolution (may cause artifacts!)
 * **multi-latent inference** with split-frame or masked blending
-* non-square aspect ratio support (picked from dataset; resolution must be divisible by 2**n, such as 512x256, 1280x768, etc.)
-* transparency (alpha channel) support (picked from dataset)
+* non-square aspect ratio support (auto-picked from dataset; resolution must be divisible by 2**n, such as 512x256, 1280x768, etc.)
+* transparency (alpha channel) support (auto-picked from dataset)
 * models mixing (SWA) and layers-blending (from [Justin Pinkney])
 * freezing lower D layers for better finetuning (from [Freeze the Discriminator])
 
@@ -32,34 +32,35 @@ also, from [Aydao] ::
 
 also, from [Peter Baylies] and [skyflynil] ::
 * non-progressive configs (E,F) with single-scale datasets
-* raw JPG support in TFRecords dataset (dramatic savings in disk space & dataset creation time)
+* raw JPG support in TFRecords dataset (auto-picked from source images)
 * conditional support (labels)
 * vertical mirroring augmentation
 
 ## Training
 
-* Put your files in `data` as subfolder. If needed, crop square fragments from `source` video or directory with images (feasible method, if you work with patterns or shapes, rather than compostions):
+* Put your images in `data` as subfolder. Ensure they all have the same color channels (monochrome, RGB or RGBA).  
+If needed, crop square fragments from `source` video or directory with images (feasible method, if you work with patterns or shapes, rather than compostions):
 ```
  multicrop.bat source 512 256 
 ```
 This will cut every source image (or video frame) into 512x512px fragments, overlapped with 256px shift by X and Y. Result will be in directory `source-sub`, rename it as you wish. Non-square dataset should be prepared separately.
 
-* Make compact TFRecords dataset from directory with JPG images `data/mydata`:
+* Make TFRecords dataset from directory `data/mydata`:
 ```
  prepare_dataset.bat mydata
 ```
-This will create file `mydata-512x512.tfr` in `data` directory (if your dataset resolution is 512x512). For images with alpha channel remove `--jpg` option from this bat-file, and also `--jpg_data` option from `train.bat` or `train_resume.bat` files. For conditional model split the data by subfolders (`mydata/1`, `mydata/2`, ..) and add `--labels` option.
+This will create file `mydata-512x512.tfr` in `data` directory (if your dataset resolution is 512x512). Images without alpha channel will be stored directly as JPG (dramatically reducing file size). For conditional model split the data by subfolders (`mydata/1`, `mydata/2`, ..) and add `--labels` option.
 
 * Train StyleGAN2 on prepared dataset:
 ```
  train.bat mydata
 ```
-This will run training process, according to the options in `src/train.py`. If there's no TFRecords file from the previous step, it will be created at this point. The training results (models and samples) are saved under the `train` directory, similar to original Nvidia approach. Only newest configs E and F are used in this repo (default is F; set `--config E` if you face OOM issue). 
+This will run training process, according to the options in `src/train.py`. If there's no TFRecords file from the previous step, it will be created at this point. Results (models and samples) are saved under `train` directory, similar to original Nvidia approach. Only newest configs E and F are used in this repo (default is F; set `--config E` if you face OOM issue). 
 
 Please note: we save both compact models (containing only Gs network for inference) as `<dataset>-...pkl` (e.g. `mydata-512-0360.pkl`), and full models (containing G/D/Gs networks for further training) as `snapshot-...pkl`. The naming is for convenience only, it does not affect the operations anymore (as the arguments are stored inside the models).
 
 For small datasets (100x images instead of 10000x) one should add `--d_aug` option to use [Differential Augmentation] for more effective training. 
-The length of the training is defined by `--lod_step_kimg XX` argument. It's kind of legacy from [progressive GAN] and defines one step of progressive training. The network with base resolution 1024px will be trained for 20 such steps, for 512px - 18 steps, et cetera. Reasonable `lod_step_kimg` value for big datasets is 300-600, while in `--d_aug` mode 20-40 is sufficient.
+Length of the training is defined by `--lod_step_kimg XX` argument. It's kind of legacy from [progressive GAN] and defines one step of progressive training. Network with base resolution 1024px will be trained for 20 such steps, for 512px - 18 steps, et cetera. Reasonable `lod_step_kimg` value for big datasets is 300-600, while in `--d_aug` mode 20-40 is sufficient.
 
 * Resume training on `mydata` dataset from the last saved model at `train/000-mydata-512-f` directory:
 ```
@@ -122,15 +123,15 @@ This will load base dlatent point from `_in/blonde458.npy` and move it along lat
 ```
  model_convert.bat snapshot-1024.pkl 
 ```
-The resulting file is saved with `-Gs` suffix. It's recommended to add `-r` option to reconstruct the network, saving necessary arguments with it. Useful for foreign downloaded models.
+Resulting file is saved with `-Gs` suffix. It's recommended to add `-r` option to reconstruct the network, saving necessary arguments with it. Useful for foreign downloaded models.
 
 * Add or remove layers (from a trained model) to adjust its resolution for further finetuning:
 ```
  model_convert.bat snapshot-256.pkl --res 512
 ```
-This will produce new model with 512px resolution, populating weights on the layers up to 256px from the source snapshot (the rest will be initialized randomly). It also can decrease resolution (say, make 512 from 1024). Note that this effectively changes the number of layers in the model. 
+This will produce new model with 512px resolution, populating weights on the layers up to 256px from the source snapshot (the rest will be initialized randomly). It also can decrease resolution (say, make 512 from 1024). Note that this effectively changes number of layers in the model. 
 
-This option works with complete (G/D/Gs) models only, since it's purposed for transfer-learning (the resulting model will contain either partially random weights, or wrong `ToRGB` params). 
+This option works with complete (G/D/Gs) models only, since it's purposed for transfer-learning (resulting model will contain either partially random weights, or wrong `ToRGB` params). 
 
 * Crop resolution of a trained model:
 ```

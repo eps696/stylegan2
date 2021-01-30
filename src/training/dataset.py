@@ -17,7 +17,6 @@ from util.utilgan import calc_res
 class TFRecordDataset:
     def __init__(self,
                  tfrecord,              # tfrecords file
-                 jpg_data=False,
                  resolution=None,       # Dataset resolution, None = autodetect.
                  label_file=None,       # Relative path of the labels file, None = autodetect.
                  max_label_size=0,      # 0 = no labels, 'full' = full labels, <int> = N first label components.
@@ -33,7 +32,6 @@ class TFRecordDataset:
         self.shape = []        # [channels, height, width]
         self.dtype = 'uint8'
         self.dynamic_range = [0, 255]
-        self.jpg_data = jpg_data
         self.label_file = label_file
         self.label_size = None      # components
         self.label_dtype = None
@@ -55,10 +53,8 @@ class TFRecordDataset:
         
         tfr_opt = tf.python_io.TFRecordOptions(tf.python_io.TFRecordCompressionType.NONE)
         for record in tf.python_io.tf_record_iterator(tfr_file, tfr_opt): # in fact only one 
-            if self.jpg_data is True:
-                tfr_shape = self.parse_tfrecord_jpg_shape(record) # [c,h,w]
-            else:
-                tfr_shape = self.parse_tfrecord_np(record).shape # [c,h,w]
+            tfr_shape = self.parse_tfrecord_shape(record) # [c,h,w]
+            jpg_data = tfr_shape[0] < 4
             break
 
         # Autodetect label filename.
@@ -96,7 +92,7 @@ class TFRecordDataset:
             self._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(self._tf_labels_var)
             
             dset = tf.data.TFRecordDataset(tfr_file, compression_type='', buffer_size=buffer_mb << 20)
-            if self.jpg_data is True:
+            if jpg_data is True:
                 dset = dset.map(self.parse_tfrecord_tf_jpg, num_parallel_calls=num_threads)
             else:
                 dset = dset.map(self.parse_tfrecord_tf, num_parallel_calls=num_threads)
@@ -129,9 +125,9 @@ class TFRecordDataset:
         return tf.transpose(image, [2,0,1]) 
         # return tf.reshape(data, features["shape"])
 
-    # Parse image shape from a JPG tfrecords file into NumPy array.
+    # Parse image shape from a tfrecords file into NumPy array.
     @staticmethod
-    def parse_tfrecord_jpg_shape(record):
+    def parse_tfrecord_shape(record):
         ex = tf.train.Example()
         ex.ParseFromString(record)
         shape = ex.features.feature['shape'].int64_list.value # pylint: disable=no-member

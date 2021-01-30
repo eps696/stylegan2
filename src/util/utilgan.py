@@ -177,14 +177,14 @@ def peak_roll(width, count, num, delta):
     else:
         full_ax = peak(step, delta)[:width]
     if num == 0: 
-        shift = width - (step//2) # must be positive!
+        shift = max(width - (step//2), 0.) # must be positive!
     else:
         shift = step*num - (step//2)
     full_ax = tf.roll(full_ax, shift, 0)
     return full_ax # [width,]
 
 def peak(steps, delta):
-    x = tf.linspace(0-delta, 1.+ delta, steps)
+    x = tf.linspace(0.-delta, 1.+ delta, steps)
     x_rev = tf.reverse(x,[0])
     x = tf.concat((x, x_rev), 0)
     x = tf.clip_by_value(x, 0., 1.)
