@@ -17,10 +17,10 @@ Note about [StyleGAN2-ada]: Performed tests have shown yet smoother (not faster!
 * models mixing (SWA) and layers-blending (from [Justin Pinkney])
 * freezing lower D layers for better finetuning (from [Freeze the Discriminator])
 
-Various running methods ::
-* Windows batch-commands (preferred, if you're on Windows)
-* local Jupyter notebook (with brief examples for beginners)
-* [Colab notebook]  
+Few command formats ::
+* Windows batch-files (preferred, if you're on Windows)
+* local Jupyter notebook (for non-Windows platforms)
+* [Colab notebook] with maximum ease of use 
 
 also, from [Data-Efficient GANs] ::
 * differential augmentation for fast training on small datasets (~100 images)
