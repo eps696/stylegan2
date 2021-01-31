@@ -141,14 +141,14 @@ def main():
     parser.add_argument('--resume', default=None, help='Resume checkpoint path. None = from scratch')
     parser.add_argument('--resume_kimg', type=int, default=0, help='Resume training from (in thousands of images)', metavar='N')
     parser.add_argument('--lod_step_kimg', type=int, default=30, help='Thousands of images per LOD/layer step (default: %(default)s)', metavar='N')
-    parser.add_argument('--finetune', action='store_true', help='finetune trained model (start from 1e4 kimg, stop when enough)')
+    parser.add_argument('--finetune', action='store_true', help='finetune trained model (some changes in lrate, etc.)')
     # network
     parser.add_argument('--config', default='F', help='Training config E (shrink) or F (large) (default: %(default)s)', metavar='CONFIG')
     parser.add_argument('--ops', default='cuda', help='Custom op implementation (cuda or ref, default: %(default)s)')
     parser.add_argument('--gamma', default=None, type=float, help='R1 regularization weight')
     # special
     parser.add_argument('--d_aug', action='store_true', help='Use Diff Augment training for small datasets')
-    parser.add_argument('--diffaug_policy', default='color,translation,cutout', help='Comma-separated list of DiffAugment policies (default: %(default)s)', metavar='..')
+    parser.add_argument('--diffaug_policy', default='translation,cutout', help='Comma-separated list of DiffAugment policies (default: %(default)s)', metavar='..') # color
     parser.add_argument('--ema_kimg', default=None, type=int, help='Half-life of exponential moving average (for Diff Augment)', metavar='N')
     parser.add_argument('--freezeD', action='store_true', help='freeze lower D layers for better finetuning')
     parser.add_argument('--cond', action='store_true', help='conditional model')
