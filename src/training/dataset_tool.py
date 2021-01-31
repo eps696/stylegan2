@@ -4,6 +4,7 @@
 """Tool for creating multi-resolution TFRecords datasets."""
 
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 import sys
 import argparse
 import numpy as np
