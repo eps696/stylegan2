@@ -311,8 +311,11 @@ def calc_init_res(shape, resolution=None):
 def basename(file):
     return os.path.splitext(os.path.basename(file))[0]
 
-def file_list(in_dir, ext=None):
-    all_files = [os.path.join(in_dir, x) for x in os.listdir(in_dir)]
+def file_list(in_dir, ext=None, subdir=None):
+    if subdir is True:
+        files = all_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(in_dir) for f in fn]
+    else:
+        files = all_files = [os.path.join(in_dir, x) for x in os.listdir(in_dir)]
     if ext is not None: 
         if isinstance(ext, list):
             files = []
@@ -320,8 +323,6 @@ def file_list(in_dir, ext=None):
                 files += [f for f in all_files if f.endswith(e)]
         elif isinstance(ext, str):
             files = [f for f in all_files if f.endswith(ext)]
-        else:
-            files = all_files
     return sorted([f for f in files if os.path.isfile(f)])
 
 def dir_list(in_dir):

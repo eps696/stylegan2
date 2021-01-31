@@ -20,7 +20,7 @@ Note about [StyleGAN2-ada]: Performed tests have shown yet smoother (not faster!
 Few command formats ::
 * Windows batch-files (preferred, if you're on Windows)
 * local Jupyter notebook (for non-Windows platforms)
-* [Colab notebook] with maximum ease of use 
+* [Colab notebook] (max ease of use)
 
 also, from [Data-Efficient GANs] ::
 * differential augmentation for fast training on small datasets (~100 images)
