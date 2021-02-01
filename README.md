@@ -20,7 +20,7 @@ Note about [StyleGAN2-ada]: Performed tests have shown yet smoother (not faster!
 Few command formats ::
 * Windows batch-files (preferred, if you're on Windows)
 * local Jupyter notebook (for non-Windows platforms)
-* [Colab notebook] (max ease of use)
+* [Colab notebook] (max ease of use, requires Google drive)
 
 also, from [Data-Efficient GANs] ::
 * differential augmentation for fast training on small datasets (~100 images)
@@ -80,7 +80,7 @@ There's no need to go for exact steps in this case, you may stop when you're ok 
  gen.bat ffhq-1024.pkl
 ```
 
-* Generate custom smooth looped animation between random latent points:
+* Generate custom smooth looped animation between random latent points ('z' space):
 ```
  gen.bat ffhq-1024 1280-720 500-20
 ```
@@ -99,23 +99,23 @@ Arguments `--digress X` would add some animated funky displacements with X stren
 
 **NB**: Windows batch-files support only 9 command arguments; if you need more options, you have to edit batch-file itself.
 
-* Project external images onto StyleGAN2 model dlatent space:
+* Project external images onto StyleGAN2 model dlatent points ('w' space):
 ```
  project.bat ffhq-1024.pkl <imagedir>
 ```
 The result (found dlatent points as Numpy arrays in `*.npy` files, and video/still previews) will be saved to `_out/proj` directory. 
 
-* Generate smooth animation between saved dlatent points:
+* Generate smooth animation between saved dlatent points ('w' space):
 ```
  play_dlatents.bat ffhq-1024 mynpy 50 1920-1080
 ```
 This will load saved dlatent points from `_in/mynpy` and produce a smooth looped animation between them (with resolution 1920x1080 and interpolation step of 50 frames). `mynpy` may be a file or a directory with `*.npy` files. To select only few frames from a sequence `somename.npy`, create text file with comma-delimited frame numbers and save it as `somename.txt` in the same directory (check examples for FFHQ model). You can also "style" the result: setting `--style_npy_file blonde458.npy` will load dlatent from `blonde458.npy` and apply it to higher layers, producing some visual similarity. `--cubic` smoothing and `--digress X` displacements are also applicable here. 
 
-* Generate animation from saved dlatent point and feature directions (say, aging/smiling/etc for faces model):
+* Generate animation from saved point and feature directions (say, aging/smiling/etc for faces model) in dlatent ('w') space:
 ```
  play_vectors.bat ffhq-1024.pkl blonde458.npy vectors_ffhq
 ```
-This will load base dlatent point from `_in/blonde458.npy` and move it along latent direction vectors from `_in/vectors_ffhq`, one by one. Result is saved as looped video. 
+This will load base dlatent point from `_in/blonde458.npy` and move it along direction vectors from `_in/vectors_ffhq`, one by one. Result is saved as looped video. 
 
 ## Tweaking models
 

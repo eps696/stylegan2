@@ -6,3 +6,4 @@ _cudacache/
 .ipynb_checkpoints/
 
 *.pkl
+*.avi
