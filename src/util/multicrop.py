@@ -21,11 +21,20 @@ parser.add_argument('-o', '--out_dir', help='Output directory')
 parser.add_argument('-s', '--size', type=int, default=512, help='Output directory')
 parser.add_argument('--step', type=int, default=None, help='Step')
 parser.add_argument('--workers', type=int, default=8, help='number of workers (8, as of cpu#)')
+parser.add_argument('--png_compression', type=int, default=1, help='png compression (0 to 9; 0 = uncompressed, fast)')
+parser.add_argument('--jpg_quality', type=int, default=95, help='jpeg quality (0 to 100; 95 = max reasonable)')
 a = parser.parse_args()
+
+# https://pillow.readthedocs.io/en/3.0.x/handbook/image-file-formats.html#jpeg
+# image quality = from 1 (worst) to 95 (best); default 75. Values above 95 should be avoided; 
+# 100 disables portions of the JPEG compression algorithm => results in large files with hardly any gain in image quality.
+
+# CV_IMWRITE_PNG_COMPRESSION from 0 to 9. A higher value means a smaller size and longer
+# compression time. If read raw images during training, use 0 for faster IO speed.
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def worker(path, save_folder, crop_size, step, min_step, compression_level):
+def worker(path, save_folder, crop_size, step, min_step):
     img_name = basename(path)
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
 
@@ -57,7 +66,10 @@ def worker(path, save_folder, crop_size, step, min_step, compression_level):
             index += 1
             crop_img = img[x:x + crop_size, y:y + crop_size, :]
             crop_img = np.ascontiguousarray(crop_img)
-            cv2.imwrite(os.path.join(save_folder, '%s-s%03d.%s' % (img_name, index, ext)), crop_img, [cv2.IMWRITE_PNG_COMPRESSION, compression_level])
+            if ext=='png':
+                cv2.imwrite(os.path.join(save_folder, '%s-s%03d.%s' % (img_name, index, ext)), crop_img, [cv2.IMWRITE_PNG_COMPRESSION, a.png_compression])
+            else:
+                cv2.imwrite(os.path.join(save_folder, '%s-s%03d.%s' % (img_name, index, ext)), crop_img, [cv2.IMWRITE_JPEG_QUALITY, a.jpg_quality])
     return 'Processing {:s} ...'.format(img_name)
 
 def main():
@@ -68,9 +80,6 @@ def main():
     crop_size = a.size
     step = a.size // 2 if a.step is None else a.step
     min_step = a.size // 8
-    compression_level = 1  # 3 is the default value in cv2
-    # CV_IMWRITE_PNG_COMPRESSION from 0 to 9. A higher value means a smaller size and longer
-    # compression time. If read raw images during training, use 0 for faster IO speed.
 
     os.makedirs(save_folder, exist_ok=True)
 
@@ -84,7 +93,7 @@ def main():
     pool = Pool(n_thread)
     for path in images:
         pool.apply_async(worker,
-            args=(path, save_folder, crop_size, step, min_step, compression_level),
+            args=(path, save_folder, crop_size, step, min_step),
             callback=update)
     pool.close()
     pool.join()

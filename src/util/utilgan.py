@@ -131,32 +131,33 @@ def latent_anima(shape, frames, transit, key_latents=None, smooth=0.5, cubic=Fal
     
 # = = = = = = = = = = = = = = = = = = = = = = = = = = = 
     
-def multimask(x, size, latmask=None, countH=1, countW=1, delta=0.):
-    if countH > 1 or countW > 1:
+def multimask(x, size, latmask=None, countHW=[1,1], delta=0.):
+    cH, cW = countHW
+    if max(countHW) > 1:
         W = x.shape[3] # width
         H = x.shape[2] # height
-        if countW > 1:
+        if cW > 1:
             stripe_mask = []
-            for i in range(countW):
-                ch_mask = peak_roll(W, countW, i, delta)[tf.newaxis, tf.newaxis, :] # [1,1,w]
+            for i in range(cW):
+                ch_mask = peak_roll(W, cW, i, delta)[tf.newaxis, tf.newaxis, :] # [1,1,w]
                 ch_mask = tf.tile(ch_mask, multiples=[1,H,1]) # [1,h,w]
                 stripe_mask.append(ch_mask)
             maskW = tf.convert_to_tensor(stripe_mask) # [x,1,h,w]
         else: maskW = [1]
-        if countH > 1:
+        if cH > 1:
             stripe_mask = []
-            for i in range(countH):
-                ch_mask = peak_roll(H, countH, i, delta)[tf.newaxis, :, tf.newaxis] # [1,h,1]
+            for i in range(cH):
+                ch_mask = peak_roll(H, cH, i, delta)[tf.newaxis, :, tf.newaxis] # [1,h,1]
                 ch_mask = tf.tile(ch_mask, multiples=[1,1,W]) # [1,h,w]
                 stripe_mask.append(ch_mask)
             maskH = tf.convert_to_tensor(stripe_mask) # [y,1,h,w]
         else: maskH = [1]
         mask = []
-        for i in range(countW):
-            for j in range(countH):
+        for i in range(cW):
+            for j in range(cH):
                 mask.append(maskW[i] * maskH[j])
         mask = tf.convert_to_tensor(mask, x.dtype) # [xy,1,h,w]
-        x = tf.reduce_sum(x[:countH*countW] * mask, 0)[tf.newaxis, :]
+        x = tf.reduce_sum(x[:cH*cW] * mask, 0)[tf.newaxis, :]
     elif latmask.shape[1] > 1 or latmask.shape[2] > 1: # [b,h,w]
         if len(latmask.shape) < 4:
             latmask = latmask[:,:,:,tf.newaxis]
@@ -201,9 +202,40 @@ def ups2d(x, factor=2):
     x = tf.reshape(x, [-1, s[1], s[2] * factor, s[3] * factor])
     return x
 
+# Tiles an array around two points, allowing for pad lengths greater than the input length
+# if symm=True, every second tile is mirrored = messed up
+# adapted from https://discuss.pytorch.org/t/symmetric-padding/19866/3
+def tile_pad(xt, padding, symm=False):
+    h, w = xt.shape[2:]
+    h, w = h.value, w.value
+    _, _, [top, bottom], [left, right] = padding
+ 
+    def tile(x, minx, maxx, symm=True):
+        rng = maxx - minx
+        if symm is True: # triangular reflection
+            double_rng = 2*rng
+            mod = np.fmod(x - minx, double_rng)
+            normed_mod = np.where(mod < 0, mod+double_rng, mod)
+            out = np.where(normed_mod >= rng, double_rng - normed_mod, normed_mod) + minx
+        else: # repeating tiles
+            mod = np.fmod(x - minx, rng)
+            out = mod + minx
+        return np.array(out, dtype=x.dtype)
+
+    x_idx = np.arange(-left, w+right)
+    y_idx = np.arange(-top, h+bottom)
+    x_pad = tile(x_idx, -0.5, w-0.5, symm)
+    y_pad = tile(y_idx, -0.5, h-0.5, symm)
+    yyt = tf.constant(y_pad)
+    xxt = tf.constant(x_pad)
+    xt = tf.gather(xt, xxt, axis=3)
+    xt = tf.gather(xt, yyt, axis=2)
+    return xt
+
 def pad_up_to(x, size, type='centr'):
-    sh = (x.shape[1].value, x.shape[2].value)
-    padding = [[0,0]]
+    sh = (x.shape[2].value, x.shape[3].value)
+    if list(sh) == list(size): return x
+    padding = [[0,0],[0,0]]
     for i, s in enumerate(size):
         if 'side' in type.lower():
             padding.append([0, s-sh[i]])
@@ -211,48 +243,38 @@ def pad_up_to(x, size, type='centr'):
             p0 = (s-sh[i]) // 2
             p1 = s-sh[i] - p0
             padding.append([p0, p1])
-    padding.append([0,0])
-    y = tf.pad(x, padding, 'symmetric')
+    if 'symm' in type.lower():
+        y = tf.pad(x, padding, 'symmetric')
+    else:
+        y = tile_pad(x, padding, symm=False)
     return y
 
-def fix_size(x, size, scale_type='centr', order='BCHW'): # scale_type = one of [pad, padside, centr, side, fit]
+# scale_type may include pad, side, symm
+def fix_size(x, size, scale_type='centr'): 
     if not len(x.get_shape()) == 4:
         raise Exception(" Wrong data rank, shape:", x.get_shape())
     if (x.get_shape()[2], x.get_shape()[3]) == size:
         return x
     if (x.get_shape()[2]*2, x.get_shape()[3]*2) == size:
-        return ups2d(x) # BCHW only
-    if order == 'BCHW': # BCHW for PGAN/SGANs, BHWC for old GANs
-        x = tf.transpose(x, [0,2,3,1])
+        return ups2d(x)
     if scale_type.lower() == 'fit':
+        x = tf.transpose(x, [0,2,3,1]) # BCHW in PGAN/SGANs, BHWC in TF
         x = tf.image.resize_images(x, size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR, align_corners=True)
-    elif 'pad' in scale_type.lower():
-        sh0 = x.get_shape().as_list()[1:3]
+        return tf.transpose(x, [0,3,1,2])
+    else:
+        sh0 = x.get_shape().as_list()[2:]
         try: size = [s.value for s in size]
         except: pass
-        new_size = sh0[:2]
-        # workaround if pad > srcsize (not enough pixels to fill in)
-        for i in [0,1]:
-            while size[i] > 2*new_size[i]:
-                new_size[i] *= 2
-                x = pad_up_to(x, new_size, scale_type)
+        if 'pad' in scale_type.lower():
+            old_size = sh0
+        else: # proportional scale to smaller side, then pad to bigger side
+            upsc = np.min([float(size[i]) / float(sh0[i]) for i in [0,1]])
+            old_size = [int(sh0[i]*upsc) for i in [0,1]]
+            x = tf.transpose(x, [0,2,3,1])
+            x = tf.image.resize_images(x, old_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR, align_corners=True)
+            x = tf.transpose(x, [0,3,1,2])
         x = pad_up_to(x, size, scale_type)
-    else: # proportional scale to smaller side, then pad to bigger side
-        sh0 = x.get_shape().as_list()[1:3]
-        try: size = [s.value for s in size]
-        except: pass
-        upsc = np.min([float(size[i]) / float(sh0[i]) for i in [0,1]])
-        new_size = [int(sh0[i]*upsc) for i in [0,1]]
-        x = tf.image.resize_images(x, new_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR, align_corners=True)
-        # workaround if pad > srcsize (i.e. not enough pixels to fill in)
-        for i in [0,1]:
-            while size[i] > 2*new_size[i]:
-                new_size[i] *= 2
-                x = pad_up_to(x, new_size, scale_type)
-        x = pad_up_to(x, size, scale_type)
-    if order == 'BCHW': # BCHW for PGAN/SGANs, BHWC for old GANs
-        x = tf.transpose(x, [0,3,1,2])
-    return x
+        return x
 
 # Make list of odd sizes for upsampling to arbitrary resolution
 def hw_scales(size, base, n, keep_first_layers=None, verbose=False):
@@ -311,18 +333,18 @@ def calc_init_res(shape, resolution=None):
 def basename(file):
     return os.path.splitext(os.path.basename(file))[0]
 
-def file_list(in_dir, ext=None, subdir=None):
+def file_list(path, ext=None, subdir=None):
     if subdir is True:
-        files = all_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(in_dir) for f in fn]
+        files = [os.path.join(dp, f) for dp, dn, fn in os.walk(path) for f in fn]
     else:
-        files = all_files = [os.path.join(in_dir, x) for x in os.listdir(in_dir)]
+        files = [os.path.join(path, f) for f in os.listdir(path)]
     if ext is not None: 
         if isinstance(ext, list):
-            files = []
-            for e in ext:
-                files += [f for f in all_files if f.endswith(e)]
+            files = [f for f in files if os.path.splitext(f.lower())[1][1:] in ext]
         elif isinstance(ext, str):
-            files = [f for f in all_files if f.endswith(ext)]
+            files = [f for f in files if f.endswith(ext)]
+        else:
+            print(' Unknown extension/type for file list!')
     return sorted([f for f in files if os.path.isfile(f)])
 
 def dir_list(in_dir):

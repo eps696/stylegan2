@@ -19,7 +19,7 @@ from training.dataset_tool import create_from_images
 from util.utilgan import basename, file_list
 
 def run(dataset, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mirror_v, \
-        lod_step_kimg, batch_size, resume, resume_kimg, finetune, num_gpus, ema_kimg, gamma, freezeD):
+        lod_kimg, kimg, batch_size, resume, resume_kimg, finetune, num_gpus, ema_kimg, gamma, freezeD):
 
     # training functions
     if d_aug: # https://github.com/mit-han-lab/data-efficient-gans
@@ -70,10 +70,10 @@ def run(dataset, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mi
     desc += '-%s' % config
     
     # training schedule
-    sched.lod_training_kimg = lod_step_kimg 
-    sched.lod_transition_kimg = lod_step_kimg 
+    sched.lod_training_kimg = lod_kimg 
+    sched.lod_transition_kimg = lod_kimg 
     sched.tick_kimg_base = 2 # if finetune else 0.2
-    train.total_kimg = lod_step_kimg * res_log2 * 3 # 1.5 * ProGAN
+    train.total_kimg = kimg if (kimg is not None and kimg >= 1) else lod_kimg * res_log2 * 3 # ~ ProGAN *1.5
     train.image_snapshot_ticks = 1
     train.network_snapshot_ticks = 5
     train.mirror_augment = mirror
@@ -140,7 +140,8 @@ def main():
     parser.add_argument('--train_dir', default='train', help='Root directory for training results (default: %(default)s)', metavar='DIR')
     parser.add_argument('--resume', default=None, help='Resume checkpoint path. None = from scratch')
     parser.add_argument('--resume_kimg', type=int, default=0, help='Resume training from (in thousands of images)', metavar='N')
-    parser.add_argument('--lod_step_kimg', type=int, default=30, help='Thousands of images per LOD/layer step (default: %(default)s)', metavar='N')
+    parser.add_argument('--lod_kimg', type=int, default=30, help='Per layer training duration (default: %(default)s)', metavar='N')
+    parser.add_argument('--kimg', type=int, default=None, help='Override total training duration', metavar='N')
     parser.add_argument('--finetune', action='store_true', help='finetune trained model (some changes in lrate, etc.)')
     # network
     parser.add_argument('--config', default='F', help='Training config E (shrink) or F (large) (default: %(default)s)', metavar='CONFIG')

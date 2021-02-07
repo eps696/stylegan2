@@ -125,8 +125,7 @@ def G_synthesis_stylegan2(
     latmask,                        # mask for split-frame latents blending
     dconst,                         # initial (const) layer displacement
     latmask_res         = [1,1],      # resolution of external mask for blending
-    countW              = 1,          # frame split count by width
-    countH              = 1,          # frame split count by height
+    countHW             = [1,1],      # frame split count by height,width
     splitfine           = 0.,         # frame split edge sharpness (float from 0)
     size                = None,       # Output size
     scale_type          = None,       # scaling way: fit, centr, side, pad, padside
@@ -188,7 +187,7 @@ def G_synthesis_stylegan2(
         if size is not None and up is True:
             x = fix_size(x, size, scale_type)
             # multi latent blending
-            x = multimask(x, size, latmask, countH, countW, splitfine)
+            x = multimask(x, size, latmask, countHW, splitfine)
         if randomize_noise:
             noise = tf.random_normal([tf.shape(x)[0], 1, x.shape[2], x.shape[3]], dtype=x.dtype)
         else:
@@ -228,7 +227,10 @@ def G_synthesis_stylegan2(
         with tf.variable_scope('Const'):
             x = tf.get_variable('const', shape=[1, nf(1), *init_res], initializer=tf.initializers.random_normal())
             x = tf.tile(tf.cast(x, dtype), [tf.shape(dlatents_in)[0], 1, 1, 1])
-            # distortion technique from Aydao
+          # !!! fix const size = breaks digress
+            # const_size = init_res if size is None else hws[0]
+            # x = fix_size(x, const_size, scale_type=scale_type)
+          # distortion technique from Aydao
             x += dconst
         with tf.variable_scope('Conv'):
             x = layer(x, layer_idx=0, size=None, fmaps=nf(1), kernel=3)

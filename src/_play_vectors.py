@@ -20,11 +20,11 @@ except: # normal console
 desc = "Customized StyleGAN2 on Tensorflow"
 parser = argparse.ArgumentParser(description=desc)
 parser.add_argument('--vector_dir', default=None, help='Saved latent directions in *.npy format')
-parser.add_argument('--npy_file', default=None, help='Saved latent vector as *.npy file')
+parser.add_argument('--base_lat', default=None, help='Saved latent vector as *.npy file')
 parser.add_argument('--out_dir', default='_out/ttt', help='Output directory')
 parser.add_argument('--model', default='models/ffhq-1024.pkl', help='path to checkpoint file')
 parser.add_argument('--size', default=None, help='output resolution, set in X-Y format')
-parser.add_argument('--scale_type', choices = ['pad','padside','centr','side','fit'], default='centr', help="pad (from center or topleft); centr/side = first scale then pad")
+parser.add_argument('--scale_type', default='pad', help="may include pad, side, symm (try padside or sidesymm, etc.)")
 parser.add_argument('--trunc', type=float, default=0.8, help='truncation psi 0..1 (lower = stable, higher = various)')
 parser.add_argument('--verbose', action='store_true')
 parser.add_argument('--ops', default='cuda', help='custom op implementation (cuda or ref)')
@@ -36,10 +36,11 @@ if a.size is not None: a.size = [int(s) for s in a.size.split('-')][::-1]
 
 def generate_image(latent):
     fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
+    args = [] if Gs.num_inputs==2 else [[None], [0]] # custom model?
     if use_d:
-        img = Gs.components.synthesis.run(latent, randomize_noise=False, output_transform=fmt)[0]
+        img = Gs.components.synthesis.run(latent, *args, randomize_noise=False, output_transform=fmt)[0]
     else:
-        img = Gs.run(latent, None, truncation_psi=a.trunc, randomize_noise=False, output_transform=fmt)[0]
+        img = Gs.run(latent, None, *args, truncation_psi=a.trunc, randomize_noise=False, output_transform=fmt)[0]
     return img
 
 def render_latent_dir(latent, direction, coeff):
@@ -145,8 +146,8 @@ def main():
     lrange = [-0.5, 0.5]
 
     # load saved latents
-    if a.npy_file is not None:
-        base_latent = load_latents(a.npy_file)
+    if a.base_lat is not None:
+        base_latent = load_latents(a.base_lat)
     else:
         print(' No NPY input given, making random')
         z_dim = Gs.input_shape[1]

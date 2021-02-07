@@ -41,7 +41,7 @@ def write_video_frame(proj, video_out):
 
 def project_image(proj, targets, work_dir, resolution, num_snapshots):
     filename = osp.join(work_dir, basename(work_dir))
-    video_out = cv2.VideoWriter(filename + '.avi', cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 24, resolution)
+    video_out = cv2.VideoWriter(filename + '.avi', cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 25, resolution)
     
     snapshot_steps = set(proj.num_steps - np.linspace(0, proj.num_steps, num_snapshots, endpoint=False, dtype=int))
     misc.save_image_grid(targets, filename + '.jpg', drange=[-1,1])

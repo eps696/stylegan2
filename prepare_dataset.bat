@@ -1,7 +1,7 @@
 @echo off
 if "%1"=="" goto help
 
-python src/training/dataset_tool.py --dataset data/%1 --jpg ^
+python src/training/dataset_tool.py --dataset data/%1 ^
 %2 %3 %4 %5 %6 %7 %8 %9
 goto end
 

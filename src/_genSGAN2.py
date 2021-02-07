@@ -1,6 +1,7 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 import os.path as osp
+import random
 import argparse
 import numpy as np
 from imageio import imread, imsave
@@ -21,14 +22,15 @@ parser = argparse.ArgumentParser(description=desc)
 parser.add_argument('--out_dir', default='_out', help='output directory')
 parser.add_argument('--model', default='models/ffhq-1024.pkl', help='path to pkl checkpoint file')
 parser.add_argument('--size', default=None, help='output resolution, set in X-Y format')
-parser.add_argument('--scale_type', choices = ['pad','padside','centr','side','fit'], default='centr', help="pad (from center or topleft); centr/side = first scale then pad")
+parser.add_argument('--scale_type', default='pad', help="may include pad, side (try padside or pad or centr, etc.)")
 parser.add_argument('--latmask', default=None, help='external mask file (or directory) for multi latent blending (overriding frame split method)')
 parser.add_argument('--nXY', '-n', default='1-1', help='multi latent frame split count by X (width) and Y (height)')
 parser.add_argument('--splitfine', type=float, default=0, help='multi latent frame split edge sharpness (0 = smooth, higher => finer)')
 parser.add_argument('--trunc', type=float, default=0.8, help='truncation psi 0..1 (lower = stable, higher = various)')
+parser.add_argument('--labels', default=None, help='labels/categories for conditioning')
 parser.add_argument('--digress', type=float, default=0, help='distortion technique by Aydao (strength of the effect)') 
 parser.add_argument('--save_lat', action='store_true', help='save latent vectors to file')
-parser.add_argument('--verbose', action='store_true')
+parser.add_argument('--verbose', '-v', action='store_true')
 parser.add_argument('--ops', default='cuda', help='custom op implementation (cuda or ref)')
 # animation
 parser.add_argument('--frames', default='200-25', help='total frames to generate, length of interpolation step')
@@ -38,7 +40,6 @@ a = parser.parse_args()
 
 if a.size is not None: a.size = [int(s) for s in a.size.split('-')][::-1]
 [a.frames, a.fstep] = [int(s) for s in a.frames.split('-')]
-[a.nX, a.nY] = [int(s) for s in a.nXY.split('-')]
 
 def main():
     os.makedirs(a.out_dir, exist_ok=True)
@@ -55,11 +56,12 @@ def main():
     
     # mask/blend latents with external latmask or by splitting the frame
     if a.latmask is None:
-        if a.verbose is True: print(' Latent blending w/split frame %d x %d' % (a.nX, a.nY))
-        n_mult = a.nX * a.nY
+        nHW = [int(s) for s in a.nXY.split('-')][::-1]
+        assert len(nHW)==2, ' Wrong count nXY: %d (must be 2)' % len(nHW)
+        n_mult = nHW[0] * nHW[1]
+        if a.verbose is True and n_mult > 1: print(' Latent blending w/split frame %d x %d' % (nHW[1], nHW[0]))
         lmask = np.tile(np.asarray([[[[None]]]]), (1,n_mult,1,1))
-        Gs_kwargs.countW = a.nX
-        Gs_kwargs.countH = a.nY
+        Gs_kwargs.countHW = nHW
         Gs_kwargs.splitfine = a.splitfine
     else:
         if a.verbose is True: print(' Latent blending with mask', a.latmask)
@@ -120,19 +122,39 @@ def main():
     else:
         dconst = np.zeros([frame_count, 1, 1, 1, 1])
 
+    # labels / conditions
+    try:
+        label_size = Gs_kwargs.label_size
+    except:
+        label_size = 0
+    if label_size > 0:
+        labels = np.zeros((frame_count, n_mult, label_size)) # [frm,X,lbl]
+        if a.labels is None:
+            label_ids = []
+            for i in range(n_mult):
+                label_ids.append(random.randint(0, label_size-1))
+        else:
+            label_ids = [int(x) for x in a.labels.split('-')]
+            label_ids = label_ids[:n_mult] # ensure we have enough labels
+        for i, l in enumerate(label_ids):
+            labels[:,i,l] = 1
+    else:
+        labels = [None]
+
     # generate images from latent timeline
     pbar = ProgressBar(frame_count)
     for i in range(frame_count):
     
         latent  = latents[i] # [X,512]
+        label   = labels[i % len(labels)]
         latmask = lmask[i % len(lmask)] if lmask is not None else [None] # [X,h,w]
         dc      = dconst[i % len(dconst)] # [X,512,4,4]
 
         # generate multi-latent result
         if Gs.num_inputs == 2:
-            output = Gs.run(latent, [None], truncation_psi=a.trunc, randomize_noise=False, output_transform=fmt)
+            output = Gs.run(latent, label, truncation_psi=a.trunc, randomize_noise=False, output_transform=fmt)
         else:
-            output = Gs.run(latent, [None], latmask, dc, truncation_psi=a.trunc, randomize_noise=False, output_transform=fmt)
+            output = Gs.run(latent, label, latmask, dc, truncation_psi=a.trunc, randomize_noise=False, output_transform=fmt)
 
         # save image
         ext = 'png' if output.shape[3]==4 else 'jpg'
@@ -143,7 +165,7 @@ def main():
     # convert latents to dlatents, save them
     if a.save_lat is True:
         latents = latents.squeeze(1) # [frm,512]
-        dlatents = Gs.components.mapping.run(latents, None, dtype='float16') # [frm,18,512]
+        dlatents = Gs.components.mapping.run(latents, label, dtype='float16') # [frm,18,512]
         filename = '{}-{}-{}.npy'.format(basename(a.model), a.size[1], a.size[0])
         filename = osp.join(osp.dirname(a.out_dir), filename)
         np.save(filename, dlatents)

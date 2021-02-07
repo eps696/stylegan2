@@ -19,11 +19,11 @@ except: # normal console
 desc = "Customized StyleGAN2 on Tensorflow"
 parser = argparse.ArgumentParser(description=desc)
 parser.add_argument('--dlatents', default=None, help='Saved dlatent vectors in single *.npy file or directory with such files')
-parser.add_argument('--style_npy_file', default=None, help='Saved latent vector for hi res (style) features')
+parser.add_argument('--style_dlat', default=None, help='Saved latent vector for hi res (style) features')
 parser.add_argument('--out_dir', default='_out', help='Output directory')
 parser.add_argument('--model', default='models/ffhq-1024-f.pkl', help='path to checkpoint file')
 parser.add_argument('--size', default=None, help='Output resolution')
-parser.add_argument('--scale_type', choices = ['pad','padside','centr','side','fit'], default='centr', help="pad (from center or topleft); centr/side = first scale then pad")
+parser.add_argument('--scale_type', default='pad', help="may include pad, side, symm (try padside or sidesymm, etc.)")
 parser.add_argument('--trunc', type=float, default=1, help='Truncation psi 0..1 (lower = stable, higher = various)')
 parser.add_argument('--digress', type=float, default=0, help='distortion technique by Aydao (strength of the effect)') 
 parser.add_argument('--verbose', action='store_true')
@@ -91,9 +91,9 @@ def main():
     print(' key dlatents', key_dlatents.shape)
     
     # replace higher layers with single (style) latent
-    if a.style_npy_file is not None:
-        print(' styling with latent', a.style_npy_file)
-        style_dlatent = load_latents(a.style_npy_file)
+    if a.style_dlat is not None:
+        print(' styling with latent', a.style_dlat)
+        style_dlatent = load_latents(a.style_dlat)
         while len(style_dlatent.shape) < 4: style_dlatent = np.expand_dims(style_dlatent, 0)
         # try replacing 5 by other value, less than dl_dim
         key_dlatents[:, :, range(5,dl_dim), :] = style_dlatent[:, :, range(5,dl_dim), :]
@@ -123,9 +123,6 @@ def main():
     pbar = ProgressBar(frame_count)
     for i in range(frame_count):
     
-        if a.digress is True:
-            tf.get_default_session().run(tf.assign(wvars[0], wts[i]))
-
         # generate multi-latent result
         if Gs.num_inputs == 2:
             output = Gs.components.synthesis.run(dlatents[i], randomize_noise=False, output_transform=fmt, minibatch_size=1)
