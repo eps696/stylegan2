@@ -13,12 +13,12 @@ import tensorflow as tf
 import dnnlib
 import dnnlib.tflib as tflib
 from dnnlib import EasyDict
-from training import dataset as _dataset
+from training import dataset
 from training.dataset_tool import create_from_images
 
 from util.utilgan import basename, file_list
 
-def run(dataset, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mirror_v, \
+def run(data, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mirror_v, \
         lod_kimg, kimg, batch_size, resume, resume_kimg, finetune, num_gpus, ema_kimg, gamma, freezeD):
 
     # training functions
@@ -42,17 +42,17 @@ def run(dataset, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mi
     G.impl    = D.impl = ops
 
     # dataset (tfrecords) - get or create
-    tfr_files = file_list(os.path.dirname(dataset), 'tfr')
-    tfr_files = [f for f in tfr_files if basename(dataset) in basename(f).split('-')]
+    tfr_files = file_list(os.path.dirname(data), 'tfr')
+    tfr_files = [f for f in tfr_files if basename(data) in basename(f).split('-')]
     if len(tfr_files) == 0 or os.stat(tfr_files[0]).st_size == 0:
-        tfr_file, total_samples = create_from_images(dataset)
+        tfr_file, total_samples = create_from_images(data)
     else:
         tfr_file = tfr_files[0]
     dataset_args = EasyDict(tfrecord=tfr_file)
     
     # resolutions
     with tf.Graph().as_default(), tflib.create_session().as_default(): # pylint: disable=not-context-manager
-        dataset_obj = _dataset.load_dataset(**dataset_args) # loading the data to see what comes out
+        dataset_obj = dataset.load_dataset(**dataset_args) # loading the data to see what comes out
         resolution = dataset_obj.resolution
         init_res = dataset_obj.init_res
         res_log2 = dataset_obj.res_log2
@@ -60,13 +60,13 @@ def run(dataset, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mi
         dataset_obj = None
     
     if list(init_res) == [4,4]: 
-        desc = '%s-%d' % (basename(dataset), resolution)
+        desc = '%s-%d' % (basename(data), resolution)
     else:
         print(' custom init resolution', init_res)
         desc = basename(tfr_file)
     G.init_res = D.init_res = list(init_res)
     
-    train.savenames = [desc.replace(basename(dataset), 'snapshot'), desc]
+    train.savenames = [desc.replace(basename(data), 'snapshot'), desc]
     desc += '-%s' % config
     
     # training schedule
@@ -136,7 +136,7 @@ def run(dataset, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mi
 def main():
     parser = argparse.ArgumentParser(description='StyleGAN2 for practice', formatter_class=argparse.RawDescriptionHelpFormatter)
     # main
-    parser.add_argument('--dataset', required=True, help='Training dataset path', metavar='DIR')
+    parser.add_argument('--data', required=True, help='Training dataset path', metavar='DIR')
     parser.add_argument('--train_dir', default='train', help='Root directory for training results (default: %(default)s)', metavar='DIR')
     parser.add_argument('--resume', default=None, help='Resume checkpoint path. None = from scratch')
     parser.add_argument('--resume_kimg', type=int, default=0, help='Resume training from (in thousands of images)', metavar='N')
