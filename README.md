@@ -10,7 +10,7 @@ Tested on Tensorflow 1.14, requires `pyturbojpeg` for JPG support. Sequence-to-v
 Notes about [StyleGAN2-ada]: 
 1) It have shown smoother convergence (not faster though), but lower output variety (comparing to Diff Augmentation approach). Moreover, in my tests ada-version has failed on few-shot datasets (50~100 images), while Diff Aug succeeded there. So meanwhile i personally prefer this repo with Diff Augmentation training.
 2) Nvidia has published [PyTorch-based StyleGAN2-ada], which is claimed to be up to 30% faster, works with flat folder datasets, and should be easier to tweak/debug than TF-based one. 
-So here is **[such repo]**, adapted to the features below (custom inference, non-square RGBA data, etc.). 
+So here is **[such repo]**, adapted to the features below (custom generation, non-square RGBA data, etc.). 
 
 ## Features
 * inference (image generation) in arbitrary resolution (finally with proper padding on both TF and Torch)
