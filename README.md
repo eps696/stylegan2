@@ -2,7 +2,7 @@
 
 <p align='center'><img src='_out/palekh-512-1536x512-3x1.jpg' /></p>
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eps696/stylegan2/blob/colab/StyleGAN2_colab.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eps696/stylegan2/blob/master/StyleGAN2_colab.ipynb)
 
 This version of famous [StyleGAN2] is intended mostly for fellow artists, who rarely look at scientific metrics, but rather need a working creative tool. At least, this is what I use daily myself. 
 Tested on Tensorflow 1.14, requires `pyturbojpeg` for JPG support. Sequence-to-video conversions require [FFMPEG]. For more explicit details refer to the original implementations. 
@@ -10,7 +10,7 @@ Tested on Tensorflow 1.14, requires `pyturbojpeg` for JPG support. Sequence-to-v
 Note about [StyleGAN2-ada]: Performed tests have shown yet smoother (not faster!) convergence, but lower output variety. Moreover, ada-version has failed on few-shot datasets (50~100 images); so meanwhile i personally stick to this repo with Diff Augmentation.
 
 ## Features
-* inference (image generation) in arbitrary resolution (may cause artifacts!)
+* inference (image generation) in arbitrary resolution; works best with
 * **multi-latent inference** with split-frame or masked blending
 * non-square aspect ratio support (auto-picked from dataset; resolution must be divisible by 2**n, such as 512x256, 1280x768, etc.)
 * transparency (alpha channel) support (auto-picked from dataset)
@@ -18,7 +18,7 @@ Note about [StyleGAN2-ada]: Performed tests have shown yet smoother (not faster!
 * freezing lower D layers for better finetuning (from [Freeze the Discriminator])
 
 Few command formats ::
-* Windows batch-files (preferred, if you're on Windows)
+* Windows batch-files (preferred, if you're on Windows with powerful GPU)
 * local Jupyter notebook (for non-Windows platforms)
 * [Colab notebook] (max ease of use, requires Google drive)
 
@@ -173,4 +173,4 @@ follow the links in the descriptions.
 [Freeze the Discriminator]: <https://arxiv.org/abs/2002.10964>
 [FFMPEG]: <https://ffmpeg.org/download.html>
 [progressive GAN]: <https://github.com/tkarras/progressive_growing_of_gans>
-[Colab notebook]: <https://colab.research.google.com/github/eps696/stylegan2/blob/colab/StyleGAN2_colab.ipynb>
+[Colab notebook]: <https://colab.research.google.com/github/eps696/stylegan2/blob/master/StyleGAN2_colab.ipynb>
