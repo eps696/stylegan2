@@ -10,7 +10,7 @@ rmdir /s /q _out\%~n1-%~n2
 goto end 
 
 :help
-echo Usage: play_dlatents model latentsdir fstep size
+echo Usage: play_dlatents model latents fstep size
 echo  e.g.: play_dlatents ffhq-1024-f npy 25 1920-1080
 
 :end

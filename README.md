@@ -7,18 +7,21 @@
 This version of famous [StyleGAN2] is intended mostly for fellow artists, who rarely look at scientific metrics, but rather need a working creative tool. At least, this is what I use daily myself. 
 Tested on Tensorflow 1.14, requires `pyturbojpeg` for JPG support. Sequence-to-video conversions require [FFMPEG]. For more explicit details refer to the original implementations. 
 
-Note about [StyleGAN2-ada]: Performed tests have shown yet smoother (not faster!) convergence, but lower output variety. Moreover, ada-version has failed on few-shot datasets (50~100 images); so meanwhile i personally stick to this repo with Diff Augmentation.
+Notes about [StyleGAN2-ada]: 
+1) It have shown smoother convergence (not faster though), but lower output variety (comparing to Diff Augmentation approach). Moreover, in my tests ada-version has failed on few-shot datasets (50~100 images), while Diff Aug succeeded there. So meanwhile i personally prefer this repo with Diff Augmentation training.
+2) Nvidia has published [PyTorch-based StyleGAN2-ada], which is claimed to be up to 30% faster, works with flat folder datasets, and should be easier to tweak/debug than TF-based one. 
+So here is **[such repo]**, adapted to the features below (custom inference, non-square RGBA data, etc.). 
 
 ## Features
-* inference (image generation) in arbitrary resolution; works best with
+* inference (image generation) in arbitrary resolution (finally with proper padding on both TF and Torch)
 * **multi-latent inference** with split-frame or masked blending
 * non-square aspect ratio support (auto-picked from dataset; resolution must be divisible by 2**n, such as 512x256, 1280x768, etc.)
 * transparency (alpha channel) support (auto-picked from dataset)
 * models mixing (SWA) and layers-blending (from [Justin Pinkney])
 * freezing lower D layers for better finetuning (from [Freeze the Discriminator])
 
-Few command formats ::
-* Windows batch-files (preferred, if you're on Windows with powerful GPU)
+Few operation formats ::
+* Windows batch-files, described below (if you're on Windows with powerful GPU)
 * local Jupyter notebook (for non-Windows platforms)
 * [Colab notebook] (max ease of use, requires Google drive)
 
@@ -55,12 +58,12 @@ This will create file `mydata-512x512.tfr` in `data` directory (if your dataset 
 ```
  train.bat mydata
 ```
-This will run training process, according to the options in `src/train.py`. If there's no TFRecords file from the previous step, it will be created at this point. Results (models and samples) are saved under `train` directory, similar to original Nvidia approach. Only newest configs E and F are used in this repo (default is F; set `--config E` if you face OOM issue). 
+This will run training process, according to the settings in `src/train.py` (check and explore those!!). If there's no TFRecords file from the previous step, it will be created at this point. Results (models and samples) are saved under `train` directory, similar to original Nvidia approach. Only newest configs E and F are used in this repo (default is F; set `--config E` if you face OOM issue). 
 
 Please note: we save both compact models (containing only Gs network for inference) as `<dataset>-...pkl` (e.g. `mydata-512-0360.pkl`), and full models (containing G/D/Gs networks for further training) as `snapshot-...pkl`. The naming is for convenience only, it does not affect the operations anymore (as the arguments are stored inside the models).
 
 For small datasets (100x images instead of 10000x) one should add `--d_aug` option to use [Differential Augmentation] for more effective training. 
-Length of the training is defined by `--lod_step_kimg XX` argument. It's kind of legacy from [progressive GAN] and defines one step of progressive training. Network with base resolution 1024px will be trained for 20 such steps, for 512px - 18 steps, et cetera. Reasonable `lod_step_kimg` value for big datasets is 300-600, while in `--d_aug` mode 20-40 is sufficient.
+Length of the training is defined by `--lod_kimg X` argument (training duration per layer/LOD). Network with base resolution 1024px will be trained for 20 such steps, for 512px - 18 steps, et cetera. Reasonable `lod_kimg` value for full training from scratch is 300-600, while for finetuning in `--d_aug` mode 20-40 is sufficient. One can override this approach, setting total duration directly with `--kimg X`.
 
 * Resume training on `mydata` dataset from the last saved model at `train/000-mydata-512-f` directory:
 ```
@@ -71,47 +74,49 @@ Length of the training is defined by `--lod_step_kimg XX` argument. It's kind of
 ```
  train_resume.bat newdata ffhq-512.pkl --finetune
 ```
-There's no need to go for exact steps in this case, you may stop when you're ok with the results (it's better to set low `lod_step_kimg` to follow the progress). Again, `--d_aug` would greatly enhance training here. There's also `--freezeD` option, supposedly enhancing finetuning on similar data.
+There's no need to go for exact steps in this case, you may stop when you're ok with the results (it's better to set low `lod_kimg` to follow the progress). Again, `--d_aug` would greatly enhance training here. There's also `--freezeD` option, supposedly enhancing finetuning on similar data.
 
 ## Generation
 
-* Generate smooth looped animation to test the model:
+Results (frame sequences and videos) are saved by default under `_out` directory.
+
+* Test the model in its native resolution:
 ```
  gen.bat ffhq-1024.pkl
 ```
 
-* Generate custom smooth looped animation between random latent points ('z' space):
+* Generate custom animation between random latent points (in `z` space):
 ```
- gen.bat ffhq-1024 1280-720 500-20
+ gen.bat ffhq-1024 1920-1080 100-20
 ```
-This will load `ffhq-1024.pkl` from `models` directory and make a 1280x720 px video of 500 frames, with interpolation step of 20 frames between keypoints. Please note: omitting `.pkl` extension would load custom network, effectively enabling arbitrary resolution, multi-latent blending, etc. Using filename with extension will load the network from PKL "as is" (useful to test foreign downloaded models). There are `--cubic` and `--gauss` options for animation smoothing, and few `--scale_type` choices. Add `--save_lat` option to save all traversed dlatent points as Numpy array in `*.npy` file (useful for further curating).
+This will load `ffhq-1024.pkl` from `models` directory and make a 1920x1080 px looped video of 100 frames, with interpolation step of 20 frames between keypoints. Please note: omitting `.pkl` extension would load custom network, effectively enabling arbitrary resolution, multi-latent blending, etc. Using filename with extension will load original network from PKL (useful to test foreign downloaded models). There are `--cubic` and `--gauss` options for animation smoothing, and few `--scale_type` choices. Add `--save_lat` option to save all traversed dlatent `w` points as Numpy array in `*.npy` file (useful for further curating).
 
 * Generate more various imagery:
 ```
- gen.bat ffhq-1024 3072-1024 500-20 -n 3-1
+ gen.bat ffhq-1024 3072-1024 100-20 -n 3-1
 ```
 This will produce animated composition of 3 independent frames, blended together horizontally (like the image in the repo header). Argument `--splitfine X` controls boundary fineness (0 = smoothest). 
 Instead of simple frame splitting, one can load external mask(s) from b/w image file (or folder with file sequence):
 ```
- gen.bat ffhq-1024 3072-1024 500-20 --latmask <path>
+ gen.bat ffhq-1024 1024-1024 100-20 --latmask _in/mask.jpg
 ```
 Arguments `--digress X` would add some animated funky displacements with X strength (by tweaking initial const layer params). Arguments `--trunc X` controls truncation psi parameter, as usual. 
 
 **NB**: Windows batch-files support only 9 command arguments; if you need more options, you have to edit batch-file itself.
 
-* Project external images onto StyleGAN2 model dlatent points ('w' space):
+* Project external images onto StyleGAN2 model dlatent points (in `w` space):
 ```
- project.bat ffhq-1024.pkl <imagedir>
+ project.bat ffhq-1024.pkl photo
 ```
 The result (found dlatent points as Numpy arrays in `*.npy` files, and video/still previews) will be saved to `_out/proj` directory. 
 
-* Generate smooth animation between saved dlatent points ('w' space):
+* Generate smooth animation between saved dlatent points (in `w` space):
 ```
- play_dlatents.bat ffhq-1024 mynpy 50 1920-1080
+ play_dlatents.bat ffhq-1024 dlats 25 1920-1080
 ```
-This will load saved dlatent points from `_in/mynpy` and produce a smooth looped animation between them (with resolution 1920x1080 and interpolation step of 50 frames). `mynpy` may be a file or a directory with `*.npy` files. To select only few frames from a sequence `somename.npy`, create text file with comma-delimited frame numbers and save it as `somename.txt` in the same directory (check examples for FFHQ model). You can also "style" the result: setting `--style_npy_file blonde458.npy` will load dlatent from `blonde458.npy` and apply it to higher layers, producing some visual similarity. `--cubic` smoothing and `--digress X` displacements are also applicable here. 
+This will load saved dlatent points from `_in/dlats` and produce a smooth looped animation between them (with resolution 1920x1080 and interpolation step of 25 frames). `dlats` may be a file or a directory with `*.npy` or `*.npz` files. To select only few frames from a sequence `somename.npy`, create text file with comma-delimited frame numbers and save it as `somename.txt` in the same directory (check examples for FFHQ model). You can also "style" the result: setting `--style_dlat blonde458.npy` will load dlatent from `blonde458.npy` and apply it to higher layers, producing some visual similarity. `--cubic` smoothing and `--digress X` displacements are also applicable here. 
 
-* Generate animation from saved point and feature directions (say, aging/smiling/etc for faces model) in dlatent ('w') space:
+* Generate animation from saved point and feature directions (say, aging/smiling/etc for faces model) in dlatent `w` space:
 ```
  play_vectors.bat ffhq-1024.pkl blonde458.npy vectors_ffhq
 ```
@@ -164,6 +169,8 @@ follow the links in the descriptions.
 [Nvidia Source Code License-NC]: <https://nvlabs.github.io/stylegan2/license.html>
 [StyleGAN2]: <https://github.com/NVlabs/stylegan2>
 [StyleGAN2-ada]: <https://github.com/NVlabs/stylegan2-ada>
+[PyTorch-based StyleGAN2-ada]: <https://github.com/NVlabs/stylegan2-ada-pytorch>
+[such repo]: <https://github.com/eps696/stylegan2ada>
 [Peter Baylies]: <https://github.com/pbaylies/stylegan2>
 [Aydao]: <https://github.com/aydao/stylegan2-surgery>
 [Justin Pinkney]: <https://github.com/justinpinkney/stylegan2/blob/master/blend_models.py>
@@ -172,5 +179,4 @@ follow the links in the descriptions.
 [Differential Augmentation]: <https://github.com/mit-han-lab/data-efficient-gans>
 [Freeze the Discriminator]: <https://arxiv.org/abs/2002.10964>
 [FFMPEG]: <https://ffmpeg.org/download.html>
-[progressive GAN]: <https://github.com/tkarras/progressive_growing_of_gans>
 [Colab notebook]: <https://colab.research.google.com/github/eps696/stylegan2/blob/master/StyleGAN2_colab.ipynb>
