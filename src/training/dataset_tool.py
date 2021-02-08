@@ -175,15 +175,15 @@ def create_from_image_folders(datadir, shuffle=True, size=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', required=True, help='Directory containing the images')
+    parser.add_argument('--data', required=True, help='Directory containing the images')
     parser.add_argument('--shuffle', type=bool, default=True, help='Randomize image order (default: 1)')
     parser.add_argument('--labels', action='store_true', help='use folders to generate labels')
     args = parser.parse_args()
 
     if args.labels is True:
-        create_from_image_folders(args.dataset, args.shuffle)
+        create_from_image_folders(args.data, args.shuffle)
     else:
-        create_from_images(args.dataset, args.shuffle)
+        create_from_images(args.data, args.shuffle)
 
 if __name__ == "__main__":
     main()

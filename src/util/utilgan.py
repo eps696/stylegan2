@@ -203,7 +203,7 @@ def ups2d(x, factor=2):
     return x
 
 # Tiles an array around two points, allowing for pad lengths greater than the input length
-# if symm=True, every second tile is mirrored = messed up
+# NB: if symm=True, every second tile is mirrored = messed up in GAN
 # adapted from https://discuss.pytorch.org/t/symmetric-padding/19866/3
 def tile_pad(xt, padding, symm=False):
     h, w = xt.shape[2:]
@@ -218,7 +218,7 @@ def tile_pad(xt, padding, symm=False):
             normed_mod = np.where(mod < 0, mod+double_rng, mod)
             out = np.where(normed_mod >= rng, double_rng - normed_mod, normed_mod) + minx
         else: # repeating tiles
-            mod = np.fmod(x - minx, rng)
+            mod = np.remainder(x - minx, rng)
             out = mod + minx
         return np.array(out, dtype=x.dtype)
 
@@ -243,10 +243,7 @@ def pad_up_to(x, size, type='centr'):
             p0 = (s-sh[i]) // 2
             p1 = s-sh[i] - p0
             padding.append([p0, p1])
-    if 'symm' in type.lower():
-        y = tf.pad(x, padding, 'symmetric')
-    else:
-        y = tile_pad(x, padding, symm=False)
+    y = tile_pad(x, padding, symm = 'symm' in type.lower())
     return y
 
 # scale_type may include pad, side, symm

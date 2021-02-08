@@ -14,7 +14,7 @@ python src/_genSGAN2.py --model models/%~n1.pkl --out_dir _out/%~n1 --frames 200
 
 :ff
 ffmpeg -y -v warning -i _out\%~n1\%%06d.jpg -c:v mjpeg -q:v 2 _out/%~n1-%2.avi
-rmdir /s /q _out\%~n1
+rem rmdir /s /q _out\%~n1
 
 goto end
 
