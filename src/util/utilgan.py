@@ -263,12 +263,12 @@ def fix_size(x, size, scale_type='centr'):
         try: size = [s.value for s in size]
         except: pass
         if 'pad' in scale_type.lower():
-            old_size = sh0
+            pass
         else: # proportional scale to smaller side, then pad to bigger side
-            upsc = np.min([float(size[i]) / float(sh0[i]) for i in [0,1]])
-            old_size = [int(sh0[i]*upsc) for i in [0,1]]
+            upsc = np.min(size) / np.min(sh0)
+            new_size = [int(sh0[i]*upsc) for i in [0,1]]
             x = tf.transpose(x, [0,2,3,1])
-            x = tf.image.resize_images(x, old_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR, align_corners=True)
+            x = tf.image.resize_images(x, new_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR, align_corners=True)
             x = tf.transpose(x, [0,3,1,2])
         x = pad_up_to(x, size, scale_type)
         return x

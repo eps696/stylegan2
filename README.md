@@ -163,6 +163,8 @@ Copyright © 2019, NVIDIA Corporation. All rights reserved.
 Made available under the [Nvidia Source Code License-NC]
 Original paper: http://arxiv.org/abs/1912.04958
 
+Differentiable Augmentation for Data-Efficient GAN Training: https://arxiv.org/abs/2006.10738
+
 Other contributions:
 follow the links in the descriptions.
 
