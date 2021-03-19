@@ -55,7 +55,7 @@ also, from [Peter Baylies] and [skyflynil] ::
 | &boxvr;&nbsp; **src** | source code
 | &boxur;&nbsp; **train** | training folders
 | &ensp;&ensp; &boxvr;&nbsp;  ffhq-512.pkl | [example] pre-trained model file (full G/D/Gs)
-| &ensp;&ensp; &boxvr;&nbsp;  000-mydata-512-.. | [example] auto-created trained folder
+| &ensp;&ensp; &boxvr;&nbsp;  000-mydata-512-.. | [example] auto-created training folder
 | &ensp;&ensp; &boxur;&nbsp;&#x22ef;  | 
 
 ## Training
