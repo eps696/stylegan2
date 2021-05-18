@@ -86,7 +86,7 @@ Training duration is defined by `--kimg X` argument (amount of thousands of samp
 
 * Resume training on `mydata` dataset from the last saved model at `train/000-mydata-512-f` directory:
 ```
- train_resume.bat mydata 000-mydata-512-f
+ train_resume.bat mydata 000-mydata-512-f --kimg 1000
 ```
 
 * Uptrain (finetune) trained model `ffhq-512.pkl` on new data:
