@@ -82,7 +82,7 @@ This will run training process, according to the settings in `src/train.py` (che
 Please note: we save both compact models (containing only Gs network for inference) as `<dataset>-...pkl` (e.g. `mydata-512-0360.pkl`), and full models (containing G/D/Gs networks for further training) as `snapshot-...pkl`. The naming is for convenience only, it does not affect the operations anymore (as the arguments are stored inside the models).
 
 For small datasets (100x images instead of 10000x) one should add `--d_aug` option to use [Differential Augmentation] for more effective training. 
-Length of the training is defined by `--lod_kimg X` argument (training duration per layer/LOD). Network with base resolution 1024px will be trained for 20 such steps, for 512px - 18 steps, et cetera. Reasonable `lod_kimg` value for full training from scratch is 300-600, while for finetuning in `--d_aug` mode 20-40 is sufficient. One can override this approach, setting total duration directly with `--kimg X`.
+Training duration is defined by `--kimg X` argument (amount of thousands of samples processed). Reasonable value for training from scratch is 5000, while for finetuning in `--d_aug` mode 1000 may be sufficient.  
 
 * Resume training on `mydata` dataset from the last saved model at `train/000-mydata-512-f` directory:
 ```
@@ -91,9 +91,9 @@ Length of the training is defined by `--lod_kimg X` argument (training duration 
 
 * Uptrain (finetune) trained model `ffhq-512.pkl` on new data:
 ```
- train_resume.bat newdata ffhq-512.pkl --finetune
+ train_resume.bat newdata ffhq-512.pkl
 ```
-There's no need to go for exact steps in this case, you may stop when you're ok with the results (it's better to set low `lod_kimg` to follow the progress). Again, `--d_aug` would greatly enhance training here. There's also `--freezeD` option, supposedly enhancing finetuning on similar data.
+There's no need to go for exact steps in this case, you may stop when you're ok with the results. Again, `--d_aug` would greatly enhance training here. There's also `--freezeD` option, supposedly enhancing finetuning on similar data.
 
 ## Generation
 

@@ -78,7 +78,7 @@ def training_loop(
         if resume_pkl is not None:
             if os.path.isdir(resume_pkl):
                 resume_pkl, resume_kimg = misc.locate_latest_pkl(resume_pkl)
-            print(' Loading networks from "%s", kimg %.3g' % (resume_pkl, resume_kimg))
+            print(' Loading networks from "%s", kimg %d' % (resume_pkl, resume_kimg))
             rG, rD, rGs = misc.load_pkl(resume_pkl)
             if resume_with_new_nets:
                 G.copy_vars_from(rG)

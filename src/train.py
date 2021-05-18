@@ -19,7 +19,7 @@ from training.dataset_tool import create_from_images
 from util.utilgan import basename, file_list
 
 def run(data, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mirror_v, \
-        lod_kimg, kimg, batch_size, resume, resume_kimg, finetune, num_gpus, ema_kimg, gamma, freezeD):
+        kimg, batch_size, lrate, resume, resume_kimg, num_gpus, ema_kimg, gamma, freezeD):
 
     # training functions
     if d_aug: # https://github.com/mit-han-lab/data-efficient-gans
@@ -70,26 +70,20 @@ def run(data, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mirro
     desc += '-%s' % config
     
     # training schedule
-    sched.lod_training_kimg = lod_kimg 
-    sched.lod_transition_kimg = lod_kimg 
-    sched.tick_kimg_base = 2 # if finetune else 0.2
-    train.total_kimg = kimg if (kimg is not None and kimg >= 1) else lod_kimg * res_log2 * 3 # ~ ProGAN *1.5
+    train.total_kimg = kimg
     train.image_snapshot_ticks = 1
     train.network_snapshot_ticks = 5
     train.mirror_augment = mirror
     train.mirror_augment_v = mirror_v
+    sched.tick_kimg_base = 2 if train.total_kimg < 2000 else 4
 
     # learning rate 
     if config == 'e':
-        if finetune: # uptrain 1024
-            sched.G_lrate_base = 0.001
-            sched.lrate_step = 150 # period for stepping to next lrate, in kimg
-        else: # train 1024
-            sched.G_lrate_base = 0.001
-            sched.G_lrate_dict = {0:0.001, 1:0.0007, 2:0.0005, 3:0.0003}
-            sched.lrate_step = 1500 # period for stepping to next lrate, in kimg
+        sched.G_lrate_base = 0.001
+        sched.G_lrate_dict = {0:0.001, 1:0.0007, 2:0.0005, 3:0.0003}
+        sched.lrate_step = 1500 # period for stepping to next lrate, in kimg
     if config == 'f':
-        sched.G_lrate_base = 0.001 # 0.0003 for few-shot datasets
+        sched.G_lrate_base = lrate # 0.001 for big datasets, 0.0003 for few-shot
     sched.D_lrate_base = sched.G_lrate_base # *2 - not used anyway
 
     sched.minibatch_gpu_base = batch_size
@@ -140,9 +134,7 @@ def main():
     parser.add_argument('--train_dir', default='train', help='Root directory for training results (default: %(default)s)', metavar='DIR')
     parser.add_argument('--resume', default=None, help='Resume checkpoint path. None = from scratch')
     parser.add_argument('--resume_kimg', type=int, default=0, help='Resume training from (in thousands of images)', metavar='N')
-    parser.add_argument('--lod_kimg', type=int, default=30, help='Per layer training duration (default: %(default)s)', metavar='N')
     parser.add_argument('--kimg', type=int, default=None, help='Override total training duration', metavar='N')
-    parser.add_argument('--finetune', action='store_true', help='finetune trained model (some changes in lrate, etc.)')
     # network
     parser.add_argument('--config', default='F', help='Training config E (shrink) or F (large) (default: %(default)s)', metavar='CONFIG')
     parser.add_argument('--ops', default='cuda', help='Custom op implementation (cuda or ref, default: %(default)s)')
@@ -155,6 +147,7 @@ def main():
     parser.add_argument('--cond', action='store_true', help='conditional model')
     # training
     parser.add_argument('--batch_size', default=4, type=int, help='Batch size per GPU (default: %(default)s)', metavar='N')
+    parser.add_argument('-lr', '--lrate', default=0.001, type=float, help='Learning rate for F config (default: %(default)s)')
     parser.add_argument('--mirror', help='Mirror augment (default: %(default)s)', default=True, metavar='BOOL', type=bool)
     parser.add_argument('--mirror_v', help='Mirror augment vertically (default: %(default)s)', default=False, metavar='BOOL', type=bool)
     parser.add_argument('--num_gpus', help='Number of GPUs (default: %(default)s)', default=1, type=int, metavar='N')

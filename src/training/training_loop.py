@@ -49,13 +49,10 @@ def process_reals(x, labels, lod, mirror_augment, mirror_augment_v, drange_data,
 def training_schedule(
     cur_nimg,
     training_set,
-    lod_initial_resolution  = None,     # Image resolution used at the beginning.
-    lod_training_kimg       = 600,      # Thousands of real images to show before doubling the resolution.
-    lod_transition_kimg     = 600,      # Thousands of real images to show when fading in new layers.
     minibatch_size_base     = 32,       # Global minibatch size.
-    minibatch_size_dict     = {},       # Resolution-specific overrides.
+    # minibatch_size_dict     = {},       # Resolution-specific overrides.
     minibatch_gpu_base      = 4,        # Number of samples processed at a time by one GPU.
-    minibatch_gpu_dict      = {},       # Resolution-specific overrides.
+    # minibatch_gpu_dict      = {},       # Resolution-specific overrides.
     G_lrate_base            = 0.002,    # Learning rate for the generator.
     G_lrate_dict            = {},       # Resolution-specific overrides.
     D_lrate_base            = 0.002,    # Learning rate for the discriminator.
@@ -69,41 +66,24 @@ def training_schedule(
     s = dnnlib.EasyDict()
     s.kimg = cur_nimg / 1000.0
 
-    # Training phase.
-    phase_dur = lod_training_kimg + lod_transition_kimg
-    phase_idx = int(np.floor(s.kimg / phase_dur)) if phase_dur > 0 else 0
-    phase_kimg = s.kimg - phase_idx * phase_dur
-
-    # Level-of-detail and resolution.
-    if lod_initial_resolution is None:
-        s.lod = 0.0
-    else:
-        s.lod = training_set.res_log2
-        s.lod -= np.floor(np.log2(lod_initial_resolution))
-        s.lod -= phase_idx
-        if lod_transition_kimg > 0:
-            s.lod -= max(phase_kimg - lod_training_kimg, 0.0) / lod_transition_kimg
-        s.lod = max(s.lod, 0.0)
-    s.resolution = 2 ** (training_set.res_log2 - int(np.floor(s.lod)))
-
-    # Minibatch size.
-    s.minibatch_size = minibatch_size_dict.get(s.resolution, minibatch_size_base)
-    s.minibatch_gpu = minibatch_gpu_dict.get(s.resolution, minibatch_gpu_base)
+    # Fixed schedule, no lod progression
+    s.minibatch_size = minibatch_size_base
+    s.minibatch_gpu  = minibatch_gpu_base
+    s.tick_kimg = tick_kimg_base
+    s.lod = 0.0
 
     # Learning rate.
-    if lrate_step is not None: # configs E-F
+    if lrate_step is not None:
         s.G_lrate = G_lrate_dict.get(int(s.kimg / lrate_step), G_lrate_base)
         s.D_lrate = D_lrate_dict.get(int(s.kimg / lrate_step), D_lrate_base)
     else:
-        s.G_lrate = G_lrate_dict.get(s.resolution, G_lrate_base)
-        s.D_lrate = D_lrate_dict.get(s.resolution, D_lrate_base)
+        s.G_lrate = G_lrate_base
+        s.D_lrate = D_lrate_base
     if lrate_rampup_kimg > 0:
         rampup = min(s.kimg / lrate_rampup_kimg, 1.0)
         s.G_lrate *= rampup
         s.D_lrate *= rampup
 
-    # Logging period (tick duration)
-    s.tick_kimg = tick_kimg_base * lod_training_kimg / 10
     return s
 
 # Main training script.
@@ -161,7 +141,7 @@ def training_loop(
         if resume_pkl is not None:
             if os.path.isdir(resume_pkl):
                 resume_pkl, resume_kimg = misc.locate_latest_pkl(resume_pkl)
-            print(' Loading networks from "%s", kimg %.3g' % (resume_pkl, resume_kimg))
+            print(' Loading networks from "%s", kimg %d' % (resume_pkl, resume_kimg))
             rG, rD, rGs = misc.load_pkl(resume_pkl)
             if resume_with_new_nets:
                 G.copy_vars_from(rG)
