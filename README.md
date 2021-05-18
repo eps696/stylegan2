@@ -93,7 +93,7 @@ Training duration is defined by `--kimg X` argument (amount of thousands of samp
 ```
  train_resume.bat newdata ffhq-512.pkl
 ```
-There's no need to go for exact steps in this case, you may stop when you're ok with the results. Again, `--d_aug` would greatly enhance training here. There's also `--freezeD` option, supposedly enhancing finetuning on similar data.
+`--d_aug` would greatly enhance training here. There's also `--freezeD` option, supposedly enhancing finetuning on similar data.
 
 ## Generation
 
