@@ -8,9 +8,8 @@ This version of famous [StyleGAN2] is intended mostly for fellow artists, who ra
 Tested on Tensorflow 1.14, requires `pyturbojpeg` for JPG support. Sequence-to-video conversions require [FFMPEG]. For more explicit details refer to the original implementations. 
 
 Notes about [StyleGAN2-ada]: 
-1) It have shown smoother convergence (not faster though), but lower output variety (comparing to Diff Augmentation approach). Moreover, in my tests ada-version has failed on few-shot datasets (50~100 images), while Diff Aug succeeded there. So meanwhile i personally prefer this repo with Diff Augmentation training.
-2) Nvidia has published [PyTorch-based StyleGAN2-ada], which is claimed to be up to 30% faster, works with flat folder datasets, and should be easier to tweak/debug than TF-based one. 
-So here is **[such repo]**, adapted to the features below (custom generation, non-square RGBA data, etc.). 
+1) ADA version on Tensorflow has shown smoother and faster convergence on the rich enough datasets, but sometimes resulted in lower output variety (comparing to Diff Augmentation approach). It has also failed in my tests on few-shot datasets (50~100 images), while Diff Aug succeeded there. So meanwhile i personally prefer this repo with Diff Augmentation training.
+2) Nvidia has also published [PyTorch-based StyleGAN2-ada], which is claimed to be up to 30% faster, works with flat folder datasets, and should be easier to tweak/debug than TF-based one. On my tests/datasets it was systematically failing to learn the variety of macro features though, so I never used it as production tool. Anyway, here is **[such repo]**, adapted to the features below (custom generation, non-square RGBA data, etc.). 
 
 ## Features
 * inference (image generation) in arbitrary resolution (finally with proper padding on both TF and Torch)
@@ -18,7 +17,7 @@ So here is **[such repo]**, adapted to the features below (custom generation, no
 * non-square aspect ratio support (auto-picked from dataset; resolution must be divisible by 2**n, such as 512x256, 1280x768, etc.)
 * transparency (alpha channel) support (auto-picked from dataset)
 * models mixing (SWA) and layers-blending (from [Justin Pinkney])
-* freezing lower D layers for better finetuning (from [Freeze the Discriminator])
+* freezing lower D layers for better finetuning on similar data (from [Freeze the Discriminator])
 
 Few operation formats ::
 * Windows batch-files, described below (if you're on Windows with powerful GPU)
