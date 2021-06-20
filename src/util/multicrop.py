@@ -1,9 +1,10 @@
 import os
+import warnings
+warnings.filterwarnings("ignore")
 import sys
-from multiprocessing import Pool
-from shutil import get_terminal_size
 import time
 import argparse
+from multiprocessing import Pool
 
 import numpy as np
 import cv2
@@ -18,11 +19,13 @@ except: # normal console
 parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--in_dir', help='Input directory')
 parser.add_argument('-o', '--out_dir', help='Output directory')
-parser.add_argument('-s', '--size', type=int, default=512, help='Output directory')
-parser.add_argument('--step', type=int, default=None, help='Step')
-parser.add_argument('--workers', type=int, default=8, help='number of workers (8, as of cpu#)')
+parser.add_argument('-s', '--size', type=int, default=512, help='Output size in pixels')
+parser.add_argument('--step', type=int, default=None, help='Step to shift between crops')
+parser.add_argument('--workers', type=int, default=4, help='number of workers')
 parser.add_argument('--png_compression', type=int, default=1, help='png compression (0 to 9; 0 = uncompressed, fast)')
 parser.add_argument('--jpg_quality', type=int, default=95, help='jpeg quality (0 to 100; 95 = max reasonable)')
+parser.add_argument('-d', '--down', action='store_true', help='Downscale before crop? (smaller side to size)')
+parser.add_argument('--ext', default=None, help='Override output format')
 a = parser.parse_args()
 
 # https://pillow.readthedocs.io/en/3.0.x/handbook/image-file-formats.html#jpeg
@@ -34,7 +37,7 @@ a = parser.parse_args()
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def worker(path, save_folder, crop_size, step, min_step):
+def crop_step(path, out_dir, out_size, step, min_step):
     img_name = basename(path)
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
 
@@ -45,63 +48,58 @@ def worker(path, save_folder, crop_size, step, min_step):
         img = img[:, :, (0,0,0)]
     h, w, c = img.shape
     
-    ext = 'png' if img.shape[2]==4 else 'jpg'
+    ext = a.ext if a.ext is not None else 'png' if img.shape[2]==4 else 'jpg'
+    compr = [cv2.IMWRITE_PNG_COMPRESSION, a.png_compression] if ext=='png' else [cv2.IMWRITE_JPEG_QUALITY, a.jpg_quality]
 
     min_size = min(h,w)
-    if min_size < crop_size:
-        h = int(h * crop_size/min_size)
-        w = int(w * crop_size/min_size)
+    if min_size < out_size:
+        h = int(h * out_size/min_size)
+        w = int(w * out_size/min_size)
+        img = cv2.resize(img, (w,h), interpolation = cv2.INTER_AREA)
+    elif min_size > out_size and a.down is True:
+        h = int(h * out_size/min_size)
+        w = int(w * out_size/min_size)
         img = cv2.resize(img, (w,h), interpolation = cv2.INTER_AREA)
         
-    h_space = np.arange(0, h - crop_size + 1, step)
-    if h - (h_space[-1] + crop_size) > min_step:
-        h_space = np.append(h_space, h - crop_size)
-    w_space = np.arange(0, w - crop_size + 1, step)
-    if w - (w_space[-1] + crop_size) > min_step:
-        w_space = np.append(w_space, w - crop_size)
+    h_space = np.arange(0, h - out_size + 1, step)
+    if h - (h_space[-1] + out_size) < min_step:
+        h_space = h_space[:-1]
+    h_space = np.append(h_space, h - out_size)
+    w_space = np.arange(0, w - out_size + 1, step)
+    if w - (w_space[-1] + out_size) < min_step:
+        w_space = w_space[:-1]
+    w_space = np.append(w_space, w - out_size)
 
     index = 0
     for x in h_space:
         for y in w_space:
             index += 1
-            crop_img = img[x:x + crop_size, y:y + crop_size, :]
+            crop_img = img[x:x + out_size, y:y + out_size, :]
             crop_img = np.ascontiguousarray(crop_img)
-            if ext=='png':
-                cv2.imwrite(os.path.join(save_folder, '%s-s%03d.%s' % (img_name, index, ext)), crop_img, [cv2.IMWRITE_PNG_COMPRESSION, a.png_compression])
-            else:
-                cv2.imwrite(os.path.join(save_folder, '%s-s%03d.%s' % (img_name, index, ext)), crop_img, [cv2.IMWRITE_JPEG_QUALITY, a.jpg_quality])
+            cv2.imwrite(os.path.join(out_dir, '%s-s%03d.%s' % (img_name, index, ext)), crop_img, compr)
     return 'Processing {:s} ...'.format(img_name)
 
 def main():
     """A multi-thread tool to crop sub images."""
-    input_folder = a.in_dir
-    save_folder = a.out_dir
-    n_thread = a.workers
-    crop_size = a.size
+    os.makedirs(a.out_dir, exist_ok=True)
+    images = img_list(a.in_dir, subdir=True)
+
     step = a.size // 2 if a.step is None else a.step
-    min_step = a.size // 8
-
-    os.makedirs(save_folder, exist_ok=True)
-
-    images = img_list(input_folder, subdir=True)
+    min_step = step // 4
 
     def update(arg):
         pbar.upd(arg)
 
     pbar = ProgressBar(len(images))
-
-    pool = Pool(n_thread)
+    pool = Pool(a.workers)
     for path in images:
-        pool.apply_async(worker,
-            args=(path, save_folder, crop_size, step, min_step),
-            callback=update)
+        pool.apply_async(crop_step, args=(path, a.out_dir, a.size, step, min_step), callback=update)
     pool.close()
     pool.join()
-    print('All subprocesses done.')
+    print('All done')
 
 
 if __name__ == '__main__':
     # workaround for multithreading in jupyter console
     __spec__ = "ModuleSpec(name='builtins', loader=<class '_frozen_importlib.BuiltinImporter'>)"
     main()
-

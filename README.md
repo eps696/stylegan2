@@ -166,7 +166,7 @@ This will produce working non-square 1024x768 model. Opposite to the method abov
 ```
  models_blend.bat model1.pkl model2.pkl <res> <level>
 ```
-`<res>` is resolution, at which the models are switched (usually 32/64/128); `<level>` is 0 or 1.
+`<res>` is resolution, at which the models are switched (usually 16/32/64); `<level>` is 0 or 1.
 
 * Mix few models by stochastic averaging all weights:
 ```

@@ -4,6 +4,8 @@
 
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
+import warnings
+warnings.filterwarnings("ignore")
 import sys
 import argparse
 import copy
@@ -71,7 +73,7 @@ def run(data, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mirro
     
     # training schedule
     train.total_kimg = kimg
-    train.image_snapshot_ticks = 1
+    train.image_snapshot_ticks = 1 * num_gpus
     train.network_snapshot_ticks = 5
     train.mirror_augment = mirror
     train.mirror_augment_v = mirror_v
@@ -86,7 +88,9 @@ def run(data, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mirro
         sched.G_lrate_base = lrate # 0.001 for big datasets, 0.0003 for few-shot
     sched.D_lrate_base = sched.G_lrate_base # *2 - not used anyway
 
-    sched.minibatch_gpu_base = batch_size
+    # batch size (for 16gb memory GPU)
+    sched.minibatch_gpu_base = 4096 // resolution if batch_size is None else batch_size
+    print(' Batch size', sched.minibatch_gpu_base)
     sched.minibatch_size_base = num_gpus * sched.minibatch_gpu_base
     sc.num_gpus = num_gpus
     
@@ -146,7 +150,7 @@ def main():
     parser.add_argument('--freezeD', action='store_true', help='freeze lower D layers for better finetuning')
     parser.add_argument('--cond', action='store_true', help='conditional model')
     # training
-    parser.add_argument('--batch_size', default=4, type=int, help='Batch size per GPU (default: %(default)s)', metavar='N')
+    parser.add_argument('--batch_size', default=None, type=int, help='Batch size per GPU (default: %(default)s)', metavar='N')
     parser.add_argument('-lr', '--lrate', default=0.001, type=float, help='Learning rate for F config (default: %(default)s)')
     parser.add_argument('--mirror', help='Mirror augment (default: %(default)s)', default=True, metavar='BOOL', type=bool)
     parser.add_argument('--mirror_v', help='Mirror augment vertically (default: %(default)s)', default=False, metavar='BOOL', type=bool)
