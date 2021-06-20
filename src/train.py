@@ -73,7 +73,7 @@ def run(data, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mirro
     
     # training schedule
     train.total_kimg = kimg
-    train.image_snapshot_ticks = 1 * num_gpus
+    train.image_snapshot_ticks = 1 * num_gpus if kimg <= 1000 else 4 * num_gpus 
     train.network_snapshot_ticks = 5
     train.mirror_augment = mirror
     train.mirror_augment_v = mirror_v
