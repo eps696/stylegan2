@@ -14,9 +14,8 @@ from dnnlib.tflib import tfutil
 import tensorflow; tf = tensorflow.compat.v1 if hasattr(tensorflow.compat, 'v1') else tensorflow
 tf.logging.set_verbosity(tf.logging.ERROR)
 
-from eps.utilgan import calc_init_res
-from eps.progress_bar import ProgressBar
-from eps.data_load import basename
+from util.utilgan import calc_init_res, basename
+from util.progress_bar import ProgressBar
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--source', required=True, help='Source model path')
