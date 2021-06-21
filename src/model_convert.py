@@ -1,5 +1,7 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
+import warnings
+warnings.filterwarnings("ignore")
 import argparse
 import pickle
 from collections import OrderedDict
@@ -12,12 +14,9 @@ from dnnlib.tflib import tfutil
 import tensorflow; tf = tensorflow.compat.v1 if hasattr(tensorflow.compat, 'v1') else tensorflow
 tf.logging.set_verbosity(tf.logging.ERROR)
 
-from util.utilgan import basename, calc_init_res
-try: # progress bar for notebooks 
-    get_ipython().__class__.__name__
-    from util.progress_bar import ProgressIPy as ProgressBar
-except: # normal console
-    from util.progress_bar import ProgressBar
+from eps.utilgan import calc_init_res
+from eps.progress_bar import ProgressBar
+from eps.data_load import basename
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--source', required=True, help='Source model path')
@@ -110,21 +109,20 @@ def copy_weights(src_net, tgt_net, vars_to_copy, D=False):
             var_dict[name] = src_net.vars[name]
         else:
             var_dict[name] = add_channel(src_net.vars[name], D=D)
-            print(name)
+            # print(name)
 
     weights_to_copy = {tgt_net.vars[name]: var_dict[name] for name in names}
     tfutil.set_vars(tfutil.run(weights_to_copy))
 
 def add_channel(x, D=False): # [BCHW]
-    if D is True: # pad dim [-2]
+    if D is True: # pad dim before last [-2]
         padding = [[0,1],[0,0]]
         for i in range(len(x.shape)-2):
             padding.insert(0, [0,0])
-    else: # pad dim [-1]
+    else: # pad last dim [-1]
         padding = [[0,1]]
         for i in range(len(x.shape)-1):
             padding.insert(0, [0,0])
-    print(padding)
     y = tf.pad(x, padding, 'symmetric') # symmetric reflect
     return y
 
@@ -154,9 +152,7 @@ def copy_and_crop_or_pad_trainables(src_net, tgt_net) -> None:
                     end = start + target_shape[0]
                     update = update[start:end,:]
                 else:
-                    print(target_name, target_shape, update.shape)
                     update = pad_symm_np(update, target_shape)
-                    print(target_name, target_shape, update.shape)
                     log = (log, source_shape, '=>', target_shape)
             else:
                 try:
@@ -179,6 +175,7 @@ def copy_and_crop_or_pad_trainables(src_net, tgt_net) -> None:
                 if source_shape[2] < target_shape[2] or source_shape[3] < target_shape[3]:
                     update = pad_symm_np(update, target_shape[2:])
                     log = (log, source_shape, '=>', target_shape)
+                    # print(pair, source_shape, target_shape)
 
             tgt_net.set_var(target_name, update)
             skip.append(source_name)
@@ -189,7 +186,7 @@ def copy_and_crop_or_pad_trainables(src_net, tgt_net) -> None:
 
 def pad_symm_np(x, size):
     sh = x.shape[-len(size):]
-    padding = [[0,0],[0,0]] if len(x.shape)-len(size) == 2 else []
+    padding = [[0,0]] * (len(x.shape)-len(size))
     for i, s in enumerate(size):
         p0 = (s-sh[i]) // 2
         p1 = s-sh[i] - p0
@@ -222,20 +219,19 @@ def main():
 
     G_in, D_in, Gs_in = load_pkl(a.source)
     print(' Loading model', a.source, Gs_in.output_shape)
-
+    _, res_in, _  = calc_init_res(Gs_in.output_shape[1:])
+    save_full = False
+    
     if a.res is not None or a.alpha is True:
-        if a.alpha is True: # EXPERIMENTAL 
-            if a.res is None: a.res = Gs_in.output_shape[2:]
-            print(' Reconstructing model with size', a.res, 'and alpha channel')
-            colors = 4
-        else:
-            print(' Reconstructing model with size', a.res)
-            colors = Gs_in.output_shape[1]
-        data_shape = [colors, *a.res] 
-        G_out, D_out, Gs_out, res_out_log2 = create_model(data_shape, True, a.labels, Gs_in.static_kwargs)
+        if a.res is None: a.res = Gs_in.output_shape[2:]
+        colors = 4 if a.alpha is True else Gs_in.output_shape[1] # EXPERIMENTAL
+        _, res_out, _ = calc_init_res([colors, *a.res])
 
-        if a.res[0] == a.res[1]:
+        if res_in != res_out or a.alpha is True: # add or remove layers
             assert G_in is not None and D_in is not None, " !! G/D subnets not found in source model !!"
+            data_shape = [colors, res_out, res_out]
+            print(' Reconstructing full model with shape', data_shape)
+            G_out, D_out, Gs_out, res_out_log2 = create_model(data_shape, True, 0, Gs_in.static_kwargs)
             res_in_log2 = np.log2(get_model_res(Gs_in))
             lod_diff = res_out_log2 - res_in_log2
             Gs_in_names_to_copy = update_dict_keys(Gs_in, 'ToRGB_lod',   'generator',     lod_diff)
@@ -244,15 +240,23 @@ def main():
             copy_weights(Gs_in, Gs_out, Gs_in_names_to_copy)
             copy_weights(G_in,  G_out,  G_in_names_to_copy)
             copy_weights(D_in,  D_out,  D_in_names_to_copy, D=True)
-            
-        else: # EXPERIMENTAL .. check source repo 
+            G_in, D_in, Gs_in = G_out, D_out, Gs_out
+            save_full = True
+
+        if a.res[0] != res_out or a.res[1] != res_out: # crop or pad layers
+            data_shape = [colors, *a.res]
+            print(' Reconstructing model with shape', data_shape)
+            G_out, D_out, Gs_out, res_out_log2 = create_model(data_shape, True, 0, Gs_in.static_kwargs)
             if G_in is not None and D_in is not None:
                 copy_and_crop_or_pad_trainables(G_in, G_out)
                 copy_and_crop_or_pad_trainables(D_in, D_out)
+                G_in, D_in = G_out, D_out
             copy_and_crop_or_pad_trainables(Gs_in, Gs_out)
+            Gs_in = Gs_out
 
-    elif a.labels > 0:
-        print(' Reconstructing full model with labels')
+    if a.labels > 0:
+        assert G_in is not None and D_in is not None, " !! G/D subnets not found in source model !!"
+        print(' Reconstructing full model with labels', a.labels)
         data_shape = Gs_in.output_shape[1:]
         G_out, D_out, Gs_out, _ = create_model(data_shape, True, a.labels, Gs_in.static_kwargs)
         if a.verbose is True: D_out.print_layers()
@@ -260,27 +264,24 @@ def main():
         copy_and_fill_trainables(G_in, G_out)
         copy_and_fill_trainables(D_in, D_out)
         copy_and_fill_trainables(Gs_in, Gs_out)
+        save_full = True
 
-    elif a.reconstruct is True:
-        print(' Reconstructing model with same size')
-        data_shape = Gs_in.output_shape[1:]
-        _, _, Gs_out, _ = create_model(data_shape, False, 0, Gs_in.static_kwargs)
-        Gs_out.copy_vars_from(Gs_in)
-
-    else:
-        Gs_out = Gs_in
+    if a.labels == 0 and a.res is None and a.alpha is not True:
+        if a.reconstruct is True:
+            print(' Reconstructing model with same size')
+            data_shape = Gs_in.output_shape[1:]
+            _, _, Gs_out, _ = create_model(data_shape, False, 0, Gs_in.static_kwargs)
+            Gs_out.copy_vars_from(Gs_in)
+        else:
+            Gs_out = Gs_in
 
     out_name = basename(a.source)
     if a.res is not None: out_name += '-%dx%d' % (a.res[1], a.res[0])
-    if a.alpha is True: out_name += 'a'
-    if a.labels > 0:
-        out_name += '-c%d' % a.labels
+    if a.alpha is True:   out_name += 'a'
+    if a.labels > 0:      out_name += '-c%d' % a.labels
+        
+    if save_full is True: # G_in is not None and D_in is not None
         save_pkl((G_out, D_out, Gs_out), os.path.join(a.out_dir, '%s.pkl' % out_name))
-    elif a.res is not None:
-        if G_in is not None and D_in is not None:
-            save_pkl((G_out, D_out, Gs_out), os.path.join(a.out_dir, '%s.pkl' % out_name))
-        else:
-            save_pkl(Gs_out, os.path.join(a.out_dir, '%s.pkl' % out_name))
     else:
         save_pkl(Gs_out, os.path.join(a.out_dir, '%s-Gs.pkl' % out_name))
 
