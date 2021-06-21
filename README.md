@@ -15,6 +15,7 @@ Notes about [StyleGAN2-ada]:
 * inference (image generation) in arbitrary resolution (finally with proper padding on both TF and Torch)
 * **multi-latent inference** with split-frame or masked blending
 * non-square aspect ratio support (auto-picked from dataset; resolution must be divisible by 2**n, such as 512x256, 1280x768, etc.)
+* various conversion options (changing resolution/aspect, adding alpha channel, etc.) for pretrained models (for further finetuning)
 * transparency (alpha channel) support (auto-picked from dataset)
 * models mixing (SWA) and layers-blending (from [Justin Pinkney])
 * freezing lower D layers for better finetuning on similar data (from [Freeze the Discriminator])
@@ -156,11 +157,18 @@ This will produce new model with 512px resolution, populating weights on the lay
 
 This option works with complete (G/D/Gs) models only, since it's purposed for transfer-learning (resulting model will contain either partially random weights, or wrong `ToRGB` params). 
 
-* Crop resolution of a trained model:
+* Crop or pad layers of a trained model to adjust its aspect ratio:
 ```
- model_convert.bat snapshot-1024.pkl --res 1024-768
+ model_convert.bat snapshot-1024.pkl --res 1280-768
 ```
-This will produce working non-square 1024x768 model. Opposite to the method above, this one doesn't change layer count. This is experimental feature (as stated by the author @Aydao), also using some voluntary logic, so works only with basic resolutions.
+If both X/Y sizes are smaller or equal (the original), this will only crop layers, producing working non-square model.  
+If least one of X/Y sizes is increased, this would pad layers, so the model will require finetuning. This would work with basic ratios only (like 4x4 => 5x3).  
+These functions are experimental, with some voluntary logic, so use with care.
+
+* Add alpha channel to a trained model for further finetuning:
+```
+ model_convert.bat snapshot-1024.pkl --alpha
+```
 
 * Combine lower layers from one model with higher layers from another:
 ```
