@@ -21,7 +21,7 @@ from dnnlib.tflib import tfutil
 from util.utilgan import basename
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--out_dir', default='_out', help='Output directory')
+parser.add_argument('--out_dir', default='./', help='Output directory')
 parser.add_argument('--pkl1', required=True, help='PKL for low res layers')
 parser.add_argument('--pkl2', required=True, help='PKL for hi res layers')
 parser.add_argument('--res', type=int, default=128, help='Resolution level at which to switch between models')
