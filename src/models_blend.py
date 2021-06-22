@@ -32,10 +32,8 @@ a = parser.parse_args()
 
 def load_pkl(filepath):
     with open(filepath, 'rb') as f:
-        Gs = pickle.load(f, encoding='latin1')
-    try: _, _, Gs = Gs
-    except: pass
-    return Gs
+        nets = pickle.load(f, encoding='latin1') 
+    return nets
     
 def save_pkl(networks, filepath):
     with open(filepath, 'wb') as file:
@@ -64,53 +62,67 @@ def extract_conv_names(model):
 
     return conv_names
 
+def blend_layers(Net_lo, Net_hi):
+    # TODO add small x offset for smoother blend animations
+    resolution = "{}x{}".format(a.res, a.res)
+    
+    model_1_names = extract_conv_names(Net_lo)
+    model_2_names = extract_conv_names(Net_hi)
+    assert all((x == y for x, y in zip(model_1_names, model_2_names)))
+
+    Net_out = Net_lo.clone()
+    
+    short_names = [(x[1:3]) for x in model_1_names]
+    full_names = [(x[0]) for x in model_1_names]
+    mid_point_idx = short_names.index((resolution, a.level))
+    mid_point_pos = model_1_names[mid_point_idx][3]
+    
+    ys = []
+    for name, resolution, level, position in model_1_names:
+        x = position - mid_point_pos
+        if a.blend_width is not None:
+            exponent = -x / a.blend_width
+            y = 1 / (1 + math.exp(exponent))
+        else:
+            y = 1 if x > 1 else 0
+        ys.append(y)
+        if a.verbose is True:
+            print("Blending {} by {}".format(name, y))
+
+    tfutil.set_vars(tfutil.run({ 
+             Net_out.vars[name]: (Net_hi.vars[name] * y + Net_lo.vars[name] * (1-y))
+             for name, y in zip(full_names, ys)} ))
+
+    return Net_out
+
 def main():
     os.makedirs(a.out_dir, exist_ok=True)
 
     tflib.init_tf()
     with tf.Session() as sess, tf.device('/gpu:0'):
-        Gs_lo = load_pkl(a.pkl1)
-        Gs_hi = load_pkl(a.pkl2)
+        Net_lo = load_pkl(a.pkl1)
+        Net_hi = load_pkl(a.pkl2)
 
-        # TODO add small x offset for smoother blend animations
-        resolution = "{}x{}".format(a.res, a.res)
-        
-        model_1_names = extract_conv_names(Gs_lo)
-        model_2_names = extract_conv_names(Gs_hi)
-        assert all((x == y for x, y in zip(model_1_names, model_2_names)))
-
-        Gs_out = Gs_lo.clone()
-        
-        short_names = [(x[1:3]) for x in model_1_names]
-        full_names = [(x[0]) for x in model_1_names]
-        mid_point_idx = short_names.index((resolution, a.level))
-        mid_point_pos = model_1_names[mid_point_idx][3]
-        
-        ys = []
-        for name, resolution, level, position in model_1_names:
-            x = position - mid_point_pos
-            if a.blend_width is not None:
-                exponent = -x / a.blend_width
-                y = 1 / (1 + math.exp(exponent))
-            else:
-                y = 1 if x > 1 else 0
-            ys.append(y)
-            if a.verbose is True:
-                print("Blending {} by {}".format(name, y))
-
-        tfutil.set_vars(tfutil.run({ 
-                 Gs_out.vars[name]: (Gs_hi.vars[name] * y + Gs_lo.vars[name] * (1-y))
-                 for name, y in zip(full_names, ys)} ))
+        try: # full model (blending only G and Gs)
+            G_lo, D_lo, Gs_lo = Net_lo
+            G_hi, D_hi, Gs_hi = Net_hi
+            G_out  = blend_layers(G_lo,  G_hi)
+            Gs_out = blend_layers(Gs_lo, Gs_hi)
+            Net_out = G_out, D_lo, Gs_out
+        except: # Gs only
+            Gs_out = blend_layers(Net_lo, Net_hi) # only Gs
+            Net_out = Gs_out
 
         out_name = os.path.join(a.out_dir, '%s-%s-%d-%d' % (basename(a.pkl1).split('-')[0], basename(a.pkl2).split('-')[0], a.res, a.level))  
-        save_pkl(Gs_out, '%s.pkl' % out_name)
+        save_pkl(Net_out, '%s.pkl' % out_name)
             
         rnd = np.random.RandomState(696)
-        grid_latents = rnd.randn(4, *Gs_lo.input_shape[1:])
+        grid_latents = rnd.randn(4, *Gs_out.input_shape[1:])
         grid_fakes = Gs_out.run(grid_latents, [None], is_validation=True, minibatch_size=1)
         grid_fakes = np.hstack(np.transpose(grid_fakes, [0,2,3,1]))
         imsave('%s.jpg' % out_name, ((grid_fakes+1)*127.5).astype(np.uint8))
         
+
 if __name__ == '__main__':
     main()
 
