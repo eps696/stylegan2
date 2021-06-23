@@ -161,20 +161,25 @@ This option works with complete (G/D/Gs) models only, since it's purposed for tr
 ```
  model_convert.bat snapshot-1024.pkl --res 1280-768
 ```
-If both X/Y sizes are smaller or equal (the original), this will only crop layers, producing working non-square model.  
-If least one of X/Y sizes is increased, this would pad layers, so the model will require finetuning. This would work with basic ratios only (like 4x4 => 5x3).  
+This produces working non-square model. In case of basic aspect conversion (like 4x4 => 5x3), complete models (G/D/Gs) will be trainable for further finetuning.  
 These functions are experimental, with some voluntary logic, so use with care.
 
 * Add alpha channel to a trained model for further finetuning:
 ```
  model_convert.bat snapshot-1024.pkl --alpha
 ```
+All above (adding/cropping/padding layers + alpha channel) can be done in one shot:
+```
+ model_convert.bat snapshot-256.pkl --res 1280-768 --alpha
+```
 
 * Combine lower layers from one model with higher layers from another:
 ```
  models_blend.bat model1.pkl model2.pkl <res> <level>
 ```
-`<res>` is resolution, at which the models are switched (usually 16/32/64); `<level>` is 0 or 1.
+`<res>` is resolution, at which the models are switched (usually 16/32/64); `<level>` is 0 or 1.  
+For inference (generation) this method works properly only for models from one "family", i.e. uptrained (finetuned) from the same original model. 
+For further training may be useful in other cases too (not tested yet!).
 
 * Mix few models by stochastic averaging all weights:
 ```
