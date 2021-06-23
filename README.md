@@ -177,7 +177,9 @@ All above (adding/cropping/padding layers + alpha channel) can be done in one sh
 ```
  models_blend.bat model1.pkl model2.pkl <res> <level>
 ```
-`<res>` is resolution, at which the models are switched (usually 16/32/64); `<level>` is 0 or 1.
+`<res>` is resolution, at which the models are switched (usually 16/32/64); `<level>` is 0 or 1.  
+For inference (generation) this method works properly only for models from one "family", i.e. uptrained (finetuned) from the same original model. 
+For further training may be useful in other cases too (not tested yet!).
 
 * Mix few models by stochastic averaging all weights:
 ```
