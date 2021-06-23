@@ -14,8 +14,12 @@ from dnnlib.tflib import tfutil
 import tensorflow; tf = tensorflow.compat.v1 if hasattr(tensorflow.compat, 'v1') else tensorflow
 tf.logging.set_verbosity(tf.logging.ERROR)
 
-from util.utilgan import calc_init_res, basename
-from util.progress_bar import ProgressBar
+from util.utilgan import basename, calc_init_res
+try: # progress bar for notebooks 
+    get_ipython().__class__.__name__
+    from util.progress_bar import ProgressIPy as ProgressBar
+except: # normal console
+    from util.progress_bar import ProgressBar
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--source', required=True, help='Source model path')

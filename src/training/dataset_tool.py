@@ -103,7 +103,8 @@ class TFRecordExporter:
             print('%-40s\r' % 'Saving labels...', end='', flush=True)
         assert labels.shape[0] == self.cur_images
         with open(self.tfr_prefix + '-rxx.labels', 'wb') as f:
-            np.save(f, labels.astype(np.int32))
+            # np.save(f, labels.astype(np.int32))
+            np.save(f, labels.astype(np.float32))
 
     def __enter__(self):
         return self

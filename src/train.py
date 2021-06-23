@@ -16,7 +16,7 @@ import dnnlib
 import dnnlib.tflib as tflib
 from dnnlib import EasyDict
 from training import dataset
-from training.dataset_tool import create_from_images
+from training.dataset_tool import create_from_images, create_from_image_folders
 
 from util.utilgan import basename, file_list
 
@@ -45,9 +45,9 @@ def run(data, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mirro
 
     # dataset (tfrecords) - get or create
     tfr_files = file_list(os.path.dirname(data), 'tfr')
-    tfr_files = [f for f in tfr_files if basename(data) in basename(f).split('-')]
+    tfr_files = [f for f in tfr_files if basename(data) == basename(f).split('-')[0]]
     if len(tfr_files) == 0 or os.stat(tfr_files[0]).st_size == 0:
-        tfr_file, total_samples = create_from_images(data)
+        tfr_file, total_samples = create_from_image_folders(data) if cond is True else create_from_images(data)
     else:
         tfr_file = tfr_files[0]
     dataset_args = EasyDict(tfrecord=tfr_file)
@@ -73,7 +73,7 @@ def run(data, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mirro
     
     # training schedule
     train.total_kimg = kimg
-    train.image_snapshot_ticks = 1 * num_gpus if kimg <= 1000 else 4 * num_gpus 
+    train.image_snapshot_ticks = 1 * num_gpus if kimg <= 1000 else 4 * num_gpus
     train.network_snapshot_ticks = 5
     train.mirror_augment = mirror
     train.mirror_augment_v = mirror_v

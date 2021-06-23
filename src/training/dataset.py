@@ -11,7 +11,7 @@ import tensorflow as tf
 import dnnlib
 import dnnlib.tflib as tflib
 
-from util.utilgan import calc_res
+from util.utilgan import calc_res, basename, file_list
 
 # Dataset class that loads data from tfrecords files.
 class TFRecordDataset:
@@ -59,7 +59,8 @@ class TFRecordDataset:
 
         # Autodetect label filename.
         if self.label_file is None:
-            guess = sorted(glob.glob(os.path.join(data_dir, '*.labels')))
+            # guess = sorted(glob.glob(os.path.join(data_dir, '*.labels')))
+            guess = [ff for ff in file_list(data_dir, 'labels') if basename(ff).split('-')[0] == basename(tfrecord).split('-')[0]]
             if len(guess):
                 self.label_file = guess[0]
         elif not os.path.isfile(self.label_file):

@@ -66,13 +66,14 @@ def main():
     else:
         if a.verbose is True: print(' Latent blending with mask', a.latmask)
         n_mult = 2
-        if os.path.isfile(a.latmask): # single file
-            lmask = np.asarray([[img_read(a.latmask)[:,:,0] / 255.]]) # [h,w]
-        elif os.path.isdir(a.latmask): # directory with frame sequence
-            lmask = np.asarray([[img_read(f)[:,:,0] / 255. for f in img_list(a.latmask)]]) # [h,w]
+        if osp.isfile(a.latmask): # single file
+            lmask = np.asarray([[img_read(a.latmask)[:,:,0] / 255.]]) # [1,1,h,w]
+        elif osp.isdir(a.latmask): # directory with frame sequence
+            lmask = np.expand_dims(np.asarray([img_read(f)[:,:,0] / 255. for f in img_list(a.latmask)]), 1) # [n,1,h,w]
         else:
             print(' !! Blending mask not found:', a.latmask); exit(1)
-        lmask = np.concatenate((lmask, 1 - lmask), 1) # [frm,2,h,w]
+        if a.verbose is True: print(' latmask shape', lmask.shape)
+        lmask = np.concatenate((lmask, 1 - lmask), 1) # [n,2,h,w]
         Gs_kwargs.latmask_res = lmask.shape[2:]
     
     # load model with arguments

@@ -75,14 +75,16 @@ This will create file `mydata-512x512.tfr` in `data` directory (if your dataset 
 
 * Train StyleGAN2 on prepared dataset:
 ```
- train.bat mydata
+ train.bat mydata --kimg 5000
 ```
-This will run training process, according to the settings in `src/train.py` (check and explore those!!). If there's no TFRecords file from the previous step, it will be created at this point. Results (models and samples) are saved under `train` directory, similar to original Nvidia approach. Only newest configs E and F are used in this repo (default is F; set `--config E` if you face OOM issue). 
+This will run training process, according to the settings in `src/train.py` (check and explore those!!). If there's no TFRecords file from the previous step, it will be created at this point. Results (models and samples) are saved under `train` directory, similar to original Nvidia approach.  
+Batch size is auto-calculated for GPU with 16gb RAM; you may set it lower explicitly with `--batch_size X`, if you face OOM. Another downgrading option in such case is to set less capable network with `--config E`.  
 
 Please note: we save both compact models (containing only Gs network for inference) as `<dataset>-...pkl` (e.g. `mydata-512-0360.pkl`), and full models (containing G/D/Gs networks for further training) as `snapshot-...pkl`. The naming is for convenience only, it does not affect the operations anymore (as the arguments are stored inside the models).
 
 For small datasets (100x images instead of 10000x) one should add `--d_aug` option to use [Differential Augmentation] for more effective training. 
 Training duration is defined by `--kimg X` argument (amount of thousands of samples processed). Reasonable value for training from scratch is 5000, while for finetuning in `--d_aug` mode 1000 may be sufficient.  
+Add `--cond` if you want to train conditional model on the dataset with labels.
 
 * Resume training on `mydata` dataset from the last saved model at `train/000-mydata-512-f` directory:
 ```
