@@ -10,7 +10,7 @@ import pickle
 import dnnlib
 import dnnlib.tflib as tflib
 
-from util.utilgan import latent_anima, basename, img_read
+from util.utilgan import latent_anima, basename, img_read, img_list
 try: # progress bar for notebooks 
     get_ipython().__class__.__name__
     from util.progress_bar import ProgressIPy as ProgressBar
