@@ -248,12 +248,15 @@ def main():
 
         if a.res[0] != res_out or a.res[1] != res_out: # crop or pad layers
             data_shape = [colors, *a.res]
-            print(' Reconstructing model with shape', data_shape)
             G_out, D_out, Gs_out, res_out_log2 = create_model(data_shape, True, 0, Gs_in.static_kwargs)
             if G_in is not None and D_in is not None:
+                print(' Reconstructing full model with shape', data_shape)
                 copy_and_crop_or_pad_trainables(G_in, G_out)
                 copy_and_crop_or_pad_trainables(D_in, D_out)
                 G_in, D_in = G_out, D_out
+                save_full = True
+            else:
+                print(' Reconstructing Gs model with shape', data_shape)
             copy_and_crop_or_pad_trainables(Gs_in, Gs_out)
             Gs_in = Gs_out
 
@@ -271,7 +274,7 @@ def main():
 
     if a.labels == 0 and a.res is None and a.alpha is not True:
         if a.reconstruct is True:
-            print(' Reconstructing model with same size')
+            print(' Reconstructing Gs model with same size')
             data_shape = Gs_in.output_shape[1:]
             _, _, Gs_out, _ = create_model(data_shape, False, 0, Gs_in.static_kwargs)
             Gs_out.copy_vars_from(Gs_in)
