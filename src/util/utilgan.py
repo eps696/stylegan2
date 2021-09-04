@@ -40,7 +40,7 @@ def get_z(shape, rnd, uniform=False):
     if uniform:
         return rnd.uniform(0., 1., shape)
     else:
-        return rnd.randn(*shape) # *x unpacks tuple/list to sequence
+        return rnd.randn(*shape)
 
 def smoothstep(x, NN=1., xmin=0., xmax=1.):
     N = math.ceil(NN)
