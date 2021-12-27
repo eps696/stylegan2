@@ -67,44 +67,10 @@ def create_model(data_shape, full=False, labels=0, kwargs_in=None):
     else:
         Gs = tflib.Network('Gs', func_name='training.networks_stylegan2.G_main', **kwargs_out)
         G = D = None
-    return G, D, Gs, res_log2
+    return G, D, Gs
 
-### [edited] from https://github.com/tr1pzz/StyleGAN-Resolution-Convertor/blob/master/StyleGAN_resolution_conversion.ipynb
-
-def get_model_res(G_net):
-    try:
-        res = G_net.static_kwargs['resolution']
-    except:
-        res = G_net.output_shape[1]
-    return res
-
-def replace_char(start_string, index, new_char):
-    new = list(start_string)
-    new[index] = new_char
-    return ''.join(new)
-
-def update_dict_keys(subnetwork, filter_string, model_name, lod_diff):
-    model_dict = subnetwork.vars
-    if model_name == 'discriminator':
-        model_dict = OrderedDict(reversed(list(model_dict.items())))
-    
-    for i, key in enumerate(model_dict):
-        if filter_string in key:
-            index = key.find(filter_string) + len(filter_string)
-            lod_str = str(int(key[index]) + lod_diff)
-            target_key = replace_char(key, index, lod_str)
-            spacing = '    ' if 'bias' in key else ''
-            if a.verbose is True: print('.. Renaming -- %s%s to -- %s%s -- shape: %s' % (key, spacing, target_key, spacing, str(model_dict[key].shape)))
-            model_dict = OrderedDict([(target_key, v) if k == key else (k, v) for k, v in model_dict.items()])
-
-    subnetwork.vars = model_dict
-    subnetwork.own_vars = OrderedDict(subnetwork.vars)
-    subnetwork.trainables = OrderedDict((name, var) for name, var in subnetwork.vars.items() if var.trainable)
-    subnetwork.var_global_to_local = OrderedDict((var.name.split(":")[0], name) for name, var in subnetwork.vars.items())
-    return subnetwork.trainables.copy()
-
-def copy_weights(src_net, tgt_net, vars_to_copy, D=False):
-    names = [name for name in tgt_net.trainables.keys() if name in vars_to_copy]
+def copy_vars(src_net, tgt_net, D=False):
+    names = [name for name in tgt_net.trainables.keys() if name in src_net.trainables.keys()]
     var_dict = OrderedDict()
 
     for name in names:
@@ -112,7 +78,6 @@ def copy_weights(src_net, tgt_net, vars_to_copy, D=False):
             var_dict[name] = src_net.vars[name]
         else:
             var_dict[name] = add_channel(src_net.vars[name], D=D)
-            # print(name)
 
     weights_to_copy = {tgt_net.vars[name]: var_dict[name] for name in names}
     tfutil.set_vars(tfutil.run(weights_to_copy))
@@ -234,21 +199,16 @@ def main():
             assert G_in is not None and D_in is not None, " !! G/D subnets not found in source model !!"
             data_shape = [colors, res_out, res_out]
             print(' Reconstructing full model with shape', data_shape)
-            G_out, D_out, Gs_out, res_out_log2 = create_model(data_shape, True, 0, Gs_in.static_kwargs)
-            res_in_log2 = np.log2(get_model_res(Gs_in))
-            lod_diff = res_out_log2 - res_in_log2
-            Gs_in_names_to_copy = update_dict_keys(Gs_in, 'ToRGB_lod',   'generator',     lod_diff)
-            G_in_names_to_copy  = update_dict_keys(G_in,  'ToRGB_lod',   'generator',     lod_diff)
-            D_in_names_to_copy  = update_dict_keys(D_in,  'FromRGB_lod', 'discriminator', lod_diff)
-            copy_weights(Gs_in, Gs_out, Gs_in_names_to_copy)
-            copy_weights(G_in,  G_out,  G_in_names_to_copy)
-            copy_weights(D_in,  D_out,  D_in_names_to_copy, D=True)
+            G_out, D_out, Gs_out = create_model(data_shape, True, 0, Gs_in.static_kwargs)
+            copy_vars(Gs_in, Gs_out)
+            copy_vars(G_in,  G_out)
+            copy_vars(D_in,  D_out, D=True)
             G_in, D_in, Gs_in = G_out, D_out, Gs_out
             save_full = True
 
         if a.res[0] != res_out or a.res[1] != res_out: # crop or pad layers
             data_shape = [colors, *a.res]
-            G_out, D_out, Gs_out, res_out_log2 = create_model(data_shape, True, 0, Gs_in.static_kwargs)
+            G_out, D_out, Gs_out = create_model(data_shape, True, 0, Gs_in.static_kwargs)
             if G_in is not None and D_in is not None:
                 print(' Reconstructing full model with shape', data_shape)
                 copy_and_crop_or_pad_trainables(G_in, G_out)
@@ -264,7 +224,7 @@ def main():
         assert G_in is not None and D_in is not None, " !! G/D subnets not found in source model !!"
         print(' Reconstructing full model with labels', a.labels)
         data_shape = Gs_in.output_shape[1:]
-        G_out, D_out, Gs_out, _ = create_model(data_shape, True, a.labels, Gs_in.static_kwargs)
+        G_out, D_out, Gs_out = create_model(data_shape, True, a.labels, Gs_in.static_kwargs)
         if a.verbose is True: D_out.print_layers()
         if a.verbose is True: G_out.print_layers()
         copy_and_fill_trainables(G_in, G_out)
@@ -276,7 +236,7 @@ def main():
         if a.reconstruct is True:
             print(' Reconstructing Gs model with same size')
             data_shape = Gs_in.output_shape[1:]
-            _, _, Gs_out, _ = create_model(data_shape, False, 0, Gs_in.static_kwargs)
+            _, _, Gs_out = create_model(data_shape, False, 0, Gs_in.static_kwargs)
             Gs_out.copy_vars_from(Gs_in)
         else:
             Gs_out = Gs_in
