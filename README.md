@@ -9,7 +9,7 @@ Tested on Tensorflow 1.14, requires `pyturbojpeg` for JPG support. Sequence-to-v
 
 Notes about [StyleGAN2-ada]: 
 1) ADA version on Tensorflow has shown smoother and faster convergence on the rich enough datasets, but sometimes resulted in lower output variety (comparing to Diff Augmentation approach). It has also failed in my tests on few-shot datasets (50~100 images), while Diff Aug succeeded there. So meanwhile i personally prefer this repo with Diff Augmentation training.
-2) Nvidia has also published [PyTorch-based StyleGAN2-ada], which is claimed to be up to 30% faster, works with flat folder datasets, and should be easier to tweak/debug than TF-based one. On my tests/datasets it was systematically failing to learn the variety of macro features though, so I never used it as production tool. Anyway, here is **[such repo]**, adapted to the features below (custom generation, non-square RGBA data, etc.). 
+2) The latest [PyTorch-based StyleGAN2-ada] flavour is claimed to be up to 30% faster, works with flat folder datasets, way easier to tweak/debug than TF-based one. It's also the only option for modern GPUs (GeForce 30xx, etc.). On my tests/datasets it was regularly failing to learn the variety of macro features though, so I have rarely used it in production. Anyway, here is **[such repo]**, adapted to the features below (custom generation, non-square RGBA data, etc.). 
 
 ## Features
 * inference (image generation) in arbitrary resolution (finally with proper padding on both TF and Torch)
@@ -188,6 +188,12 @@ For further training may be useful in other cases too (not tested yet!).
  models_mix.bat models_dir
 ```
 This would work properly only for models from one "family", i.e. uptrained (finetuned) from the same original model. 
+
+
+* Convert `sg2-1024.pt` model, created in [Rosinality](https://github.com/rosinality/stylegan2-pytorch/) or [StyleGAN2-NADA](https://github.com/rinongal/StyleGAN-nada) repo to Nvidia PKL format, by copying the weights on top of the base `sg2-1024.pkl` model of the same resolution:
+```
+ python src/model_pt2pkl.py --model_pt sg2-1024.pt --model_pkl sg2-1024.pkl
+```
 
 ## Credits
 
