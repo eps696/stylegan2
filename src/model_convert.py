@@ -27,7 +27,8 @@ parser.add_argument('--out_dir', default='./', help='Output directory for reduce
 parser.add_argument('-r', '--reconstruct', action='store_true', help='Reconstruct model (add internal arguments)')
 parser.add_argument('-s', '--res', default=None, help='Target resolution in format X-Y')
 parser.add_argument('-a', '--alpha', action='store_true', help='Add alpha channel for RGBA processing')
-parser.add_argument('-l', '--labels', default=0, type=int, help='Make conditional model')
+parser.add_argument('-l', '--labels', default=None, type=int, help='Labels for conditional model')
+parser.add_argument('-f', '--full', action='store_true', help='Save full model')
 parser.add_argument('-v', '--verbose', action='store_true')
 a = parser.parse_args()
 
@@ -49,14 +50,14 @@ def save_pkl(networks, filepath):
     with open(filepath, 'wb') as file:
         pickle.dump(networks, file, protocol=pickle.HIGHEST_PROTOCOL)
 
-def create_model(data_shape, full=False, labels=0, kwargs_in=None):
+def create_model(data_shape, full=False, labels=None, kwargs_in=None):
     init_res, resolution, res_log2 = calc_init_res(data_shape[1:])
     kwargs_out = dnnlib.EasyDict()
     kwargs_out.num_channels = data_shape[0]
     if kwargs_in is not None:
         for k in list(kwargs_in.keys()):
             kwargs_out[k] = kwargs_in[k]
-    if labels > 0: kwargs_out.label_size = labels
+    if labels is not None: kwargs_out.label_size = labels
     kwargs_out.resolution = resolution
     kwargs_out.init_res = init_res
     if a.verbose is True: print(['%s: %s'%(kv[0],kv[1]) for kv in sorted(kwargs_out.items())])
@@ -162,23 +163,29 @@ def pad_symm_np(x, size):
     return np.pad(x, padding, mode='symmetric')
 
 def copy_and_fill_trainables(src_net, tgt_net) -> None: # model => conditional 
-    source_trainables = src_net.trainables.keys()
+    train_vars = [name for name in src_net.trainables.keys() if name in tgt_net.trainables.keys()]
     skip = []
-    pbar = ProgressBar(len(source_trainables))
-    for name in source_trainables:
+    pbar = ProgressBar(len(train_vars))
+    for name in train_vars:
         x = src_net.get_var(name)
         y = tgt_net.get_var(name)
-        source_shape = x.shape
-        target_shape = y.shape
-        if source_shape != target_shape:
-            assert len(source_shape) == len(target_shape), "Different shapes: %s %s" % (str(source_shape), str(target_shape))
-            tile_count = [target_shape[i] // source_shape[i] for i in range(len(source_shape))]
-            if a.verbose is True: print(name, tile_count, source_shape, '=>', target_shape, '\n\n') # G_mapping/Dense0, D/Output
-            update = np.tile(x, tile_count) # [512,512] => [1024,512]
+        src_shape = x.shape
+        tgt_shape = y.shape
+        if src_shape != tgt_shape:
+            assert len(src_shape) == len(tgt_shape), "Different shapes: %s %s" % (str(src_shape), str(tgt_shape))
+            if np.less(tgt_shape, src_shape).any(): # kill labels: [1024,512] => [512,512]
+                try:
+                    update = x[:tgt_shape[0], :tgt_shape[1], ...] # !!! corrects only first two dims
+                except:
+                    update = x[:tgt_shape[0]]
+            elif np.greater(tgt_shape, src_shape).any(): # add labels: [512,512] => [1024,512]
+                tile_count = [tgt_shape[i] // src_shape[i] for i in range(len(src_shape))]
+                if a.verbose is True: print(name, tile_count, src_shape, '=>', tgt_shape, '\n\n') # G_mapping/Dense0, D/Output
+                update = np.tile(x, tile_count)
             tgt_net.set_var(name, update)
             skip.append(name)
         pbar.upd(name)
-    weights_to_copy = {tgt_net.vars[name]: src_net.vars[name] for name in source_trainables if name not in skip}
+    weights_to_copy = {tgt_net.vars[name]: src_net.vars[name] for name in train_vars if name not in skip}
     tfutil.set_vars(tfutil.run(weights_to_copy))
 
 
@@ -188,7 +195,6 @@ def main():
     G_in, D_in, Gs_in = load_pkl(a.source)
     print(' Loading model', a.source, Gs_in.output_shape)
     _, res_in, _  = calc_init_res(Gs_in.output_shape[1:])
-    save_full = False
     
     if a.res is not None or a.alpha is True:
         if a.res is None: a.res = Gs_in.output_shape[2:]
@@ -204,7 +210,7 @@ def main():
             copy_vars(G_in,  G_out)
             copy_vars(D_in,  D_out, D=True)
             G_in, D_in, Gs_in = G_out, D_out, Gs_out
-            save_full = True
+            a.full = True
 
         if a.res[0] != res_out or a.res[1] != res_out: # crop or pad layers
             data_shape = [colors, *a.res]
@@ -214,13 +220,13 @@ def main():
                 copy_and_crop_or_pad_trainables(G_in, G_out)
                 copy_and_crop_or_pad_trainables(D_in, D_out)
                 G_in, D_in = G_out, D_out
-                save_full = True
+                a.full = True
             else:
                 print(' Reconstructing Gs model with shape', data_shape)
             copy_and_crop_or_pad_trainables(Gs_in, Gs_out)
             Gs_in = Gs_out
 
-    if a.labels > 0:
+    if a.labels is not None:
         assert G_in is not None and D_in is not None, " !! G/D subnets not found in source model !!"
         print(' Reconstructing full model with labels', a.labels)
         data_shape = Gs_in.output_shape[1:]
@@ -230,14 +236,17 @@ def main():
         copy_and_fill_trainables(G_in, G_out)
         copy_and_fill_trainables(D_in, D_out)
         copy_and_fill_trainables(Gs_in, Gs_out)
-        save_full = True
+        a.full = True
 
-    if a.labels == 0 and a.res is None and a.alpha is not True:
+    if a.labels is None and a.res is None and a.alpha is not True:
         if a.reconstruct is True:
-            print(' Reconstructing Gs model with same size')
+            print(' Reconstructing model with same size /', 'full' if a.full else 'Gs')
             data_shape = Gs_in.output_shape[1:]
-            _, _, Gs_out = create_model(data_shape, False, 0, Gs_in.static_kwargs)
+            G_out, D_out, Gs_out = create_model(data_shape, a.full, 0, Gs_in.static_kwargs)
             Gs_out.copy_vars_from(Gs_in)
+            if a.full is True and G_in is not None and D_in is not None:
+                G_out.copy_vars_from(G_in)
+                D_out.copy_vars_from(D_in)
         else:
             Gs_out = Gs_in
 
@@ -246,7 +255,7 @@ def main():
     if a.alpha is True:   out_name += 'a'
     if a.labels > 0:      out_name += '-c%d' % a.labels
         
-    if save_full is True: # G_in is not None and D_in is not None
+    if a.full is True: # G_in is not None and D_in is not None
         save_pkl((G_out, D_out, Gs_out), os.path.join(a.out_dir, '%s.pkl' % out_name))
     else:
         save_pkl(Gs_out, os.path.join(a.out_dir, '%s-Gs.pkl' % out_name))

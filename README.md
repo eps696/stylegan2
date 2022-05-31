@@ -175,6 +175,11 @@ All above (adding/cropping/padding layers + alpha channel) can be done in one sh
  model_convert.bat snapshot-256.pkl --res 1280-768 --alpha
 ```
 
+* Add X labels to a trained model for further finetuning as conditional:
+```
+ model_convert.bat snapshot-1024.pkl --labels X
+```
+
 * Combine lower layers from one model with higher layers from another:
 ```
  models_blend.bat model1.pkl model2.pkl <res> <level>
