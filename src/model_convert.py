@@ -253,7 +253,7 @@ def main():
     out_name = basename(a.source)
     if a.res is not None: out_name += '-%dx%d' % (a.res[1], a.res[0])
     if a.alpha is True:   out_name += 'a'
-    if a.labels > 0:      out_name += '-c%d' % a.labels
+    if a.labels is not None: out_name += '-c%d' % a.labels
         
     if a.full is True: # G_in is not None and D_in is not None
         save_pkl((G_out, D_out, Gs_out), os.path.join(a.out_dir, '%s.pkl' % out_name))
