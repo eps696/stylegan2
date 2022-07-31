@@ -75,7 +75,7 @@ This will create file `mydata-512x512.tfr` in `data` directory (if your dataset 
 
 * Train StyleGAN2 on prepared dataset:
 ```
- train.bat mydata --kimg 5000
+ train.bat mydata --kimg 1000
 ```
 This will run training process, according to the settings in `src/train.py` (check and explore those!!). If there's no TFRecords file from the previous step, it will be created at this point. Results (models and samples) are saved under `train` directory, similar to original Nvidia approach.  
 Batch size is auto-calculated for GPU with 16gb RAM; you may set it lower explicitly with `--batch_size X`, if you face OOM. Another downgrading option in such case is to set less capable network with `--config E`.  
@@ -88,7 +88,7 @@ Add `--cond` if you want to train conditional model on the dataset with labels.
 
 * Resume training on `mydata` dataset from the last saved model at `train/000-mydata-512-f` directory:
 ```
- train_resume.bat mydata 000-mydata-512-f --kimg 5000
+ train_resume.bat mydata 000-mydata-512-f --kimg 1000
 ```
 
 * Uptrain (finetune) trained model `ffhq-512.pkl` on new data:
