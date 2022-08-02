@@ -130,6 +130,16 @@ def run(data, train_dir, config, d_aug, diffaug_policy, cond, ops, mirror, mirro
     kwargs.submit_config.run_desc = desc
     dnnlib.submit_run(**kwargs)
 
+def _str_to_bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 
 def main():
     parser = argparse.ArgumentParser(description='StyleGAN2 for practice', formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -152,8 +162,8 @@ def main():
     # training
     parser.add_argument('--batch_size', default=None, type=int, help='Batch size per GPU (default: %(default)s)', metavar='N')
     parser.add_argument('-lr', '--lrate', default=0.001, type=float, help='Learning rate for F config (default: %(default)s)')
-    parser.add_argument('--mirror', help='Mirror augment (default: %(default)s)', default=True, metavar='BOOL', type=bool)
-    parser.add_argument('--mirror_v', help='Mirror augment vertically (default: %(default)s)', default=False, metavar='BOOL', type=bool)
+    parser.add_argument('--mirror', help='Mirror augment (default: %(default)s)', default=True, metavar='BOOL', type=_str_to_bool)
+    parser.add_argument('--mirror_v', help='Mirror augment vertically (default: %(default)s)', default=False, metavar='BOOL', type=_str_to_bool)
     parser.add_argument('--num_gpus', help='Number of GPUs (default: %(default)s)', default=1, type=int, metavar='N')
     args = parser.parse_args()
 
