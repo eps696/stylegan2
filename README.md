@@ -2,14 +2,14 @@
 
 <p align='center'><img src='_out/palekh-512-1536x512-3x1.jpg' /></p>
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eps696/stylegan2/blob/master/StyleGAN2_colab.ipynb)
+**NB: This repo is based on Tensorflow 1.x, which is not supported on modern Nvidia GPUs (starting from 30xx series) and on Google Colab.  
+Consider using [this repo] instead.**  
 
 This version of famous [StyleGAN2] is intended mostly for fellow artists, who rarely look at scientific metrics, but rather need a working creative tool. At least, this is what I use daily myself. 
 Tested on Tensorflow 1.14, requires `pyturbojpeg` for JPG support. Sequence-to-video conversions require [FFMPEG]. For more explicit details refer to the original implementations. 
 
 Notes about [StyleGAN2-ada]: 
-1) ADA version on Tensorflow has shown smoother and faster convergence on the rich enough datasets, but sometimes resulted in lower output variety (comparing to Diff Augmentation approach). It has also failed in my tests on few-shot datasets (50~100 images), while Diff Aug succeeded there. So meanwhile i personally prefer this repo with Diff Augmentation training.
-2) The latest [PyTorch-based StyleGAN2-ada] flavour is claimed to be up to 30% faster, works with flat folder datasets, way easier to tweak/debug than TF-based one. It's also the only option for modern GPUs (GeForce 30xx, etc.). On my tests/datasets it was regularly failing to learn the variety of macro features though, so I have rarely used it in production. Anyway, here is **[such repo]**, adapted to the features below (custom generation, non-square RGBA data, etc.). 
+ADA version on Tensorflow has shown smoother and faster convergence on the rich enough datasets, but sometimes resulted in lower output variety (comparing to Diff Augmentation approach). It has also failed in my tests on few-shot datasets (50~100 images), while Diff Aug succeeded there. So meanwhile i personally prefer this repo with Diff Augmentation training.
 
 ## Features
 * inference (image generation) in arbitrary resolution (finally with proper padding on both TF and Torch)
@@ -216,7 +216,7 @@ follow the links in the descriptions.
 [StyleGAN2]: <https://github.com/NVlabs/stylegan2>
 [StyleGAN2-ada]: <https://github.com/NVlabs/stylegan2-ada>
 [PyTorch-based StyleGAN2-ada]: <https://github.com/NVlabs/stylegan2-ada-pytorch>
-[such repo]: <https://github.com/eps696/stylegan2ada>
+[this repo]: <https://github.com/eps696/stylegan2ada>
 [Peter Baylies]: <https://github.com/pbaylies/stylegan2>
 [Aydao]: <https://github.com/aydao/stylegan2-surgery>
 [Justin Pinkney]: <https://github.com/justinpinkney/stylegan2/blob/master/blend_models.py>
